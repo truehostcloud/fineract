@@ -76,7 +76,7 @@ public class SmsMessageScheduledJobServiceImpl implements SmsMessageScheduledJob
 
         });
         if (responseOne != null) {
-            // String smsResponse = responseOne.getBody();
+            
             if (!responseOne.getStatusCode().equals(HttpStatus.ACCEPTED)) {
                 log.debug("{}", responseOne.getStatusCode().value());
                 throw new ConnectionFailureException(SmsCampaignConstants.SMS);
@@ -91,7 +91,7 @@ public class SmsMessageScheduledJobServiceImpl implements SmsMessageScheduledJob
                 List<SmsMessage> toSaveMessages = new ArrayList<>();
                 List<SmsMessage> toSendNotificationMessages = new ArrayList<>();
                 
-                // First collect all messages
+                
                 for (Map.Entry<SmsCampaign, Collection<SmsMessage>> entry : smsDataMap.entrySet()) {
                     for (SmsMessage smsMessage : entry.getValue()) {
                         if (smsMessage.isNotification()) {
@@ -104,12 +104,12 @@ public class SmsMessageScheduledJobServiceImpl implements SmsMessageScheduledJob
                     }
                 }
 
-                // Save messages first to get IDs
+                
                 if (!toSaveMessages.isEmpty()) {
                     this.smsMessageRepository.saveAll(toSaveMessages);
                     this.smsMessageRepository.flush();
                     
-                    // Now create queue data with saved message IDs
+                    
                     for (Map.Entry<SmsCampaign, Collection<SmsMessage>> entry : smsDataMap.entrySet()) {
                         Collection<SmsMessageApiQueueResourceData> apiQueueResourceDatas = new ArrayList<>();
                         for (SmsMessage smsMessage : entry.getValue()) {
