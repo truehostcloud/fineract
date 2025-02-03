@@ -90,36 +90,48 @@ public class SmsMessageScheduledJobServiceImpl implements SmsMessageScheduledJob
             if (!smsDataMap.isEmpty()) {
                 List<SmsMessage> toSaveMessages = new ArrayList<>();
                 List<SmsMessage> toSendNotificationMessages = new ArrayList<>();
+                
+                // First collect all messages
                 for (Map.Entry<SmsCampaign, Collection<SmsMessage>> entry : smsDataMap.entrySet()) {
-                    Iterator<SmsMessage> smsMessageIterator = entry.getValue().iterator();
-                    Collection<SmsMessageApiQueueResourceData> apiQueueResourceDatas = new ArrayList<>();
-                    while (smsMessageIterator.hasNext()) {
-                        SmsMessage smsMessage = smsMessageIterator.next();
+                    for (SmsMessage smsMessage : entry.getValue()) {
                         if (smsMessage.isNotification()) {
                             smsMessage.setStatusType(SmsMessageStatusType.WAITING_FOR_DELIVERY_REPORT.getValue());
                             toSendNotificationMessages.add(smsMessage);
                         } else {
-                            SmsMessageApiQueueResourceData apiQueueResourceData = SmsMessageApiQueueResourceData.instance(
-                                    smsMessage.getId(), null, null, null, smsMessage.getMobileNo(), smsMessage.getMessage(),
-                                    entry.getKey().getProviderId());
-                            apiQueueResourceDatas.add(apiQueueResourceData);
                             smsMessage.setStatusType(SmsMessageStatusType.WAITING_FOR_DELIVERY_REPORT.getValue());
                             toSaveMessages.add(smsMessage);
                         }
                     }
-                    if (toSaveMessages.size() > 0) {
-                        this.smsMessageRepository.saveAll(toSaveMessages);
-                        this.smsMessageRepository.flush();
-                        this.taskExecutor.execute(new SmsTask(apiQueueResourceDatas, ThreadLocalContextUtil.getContext()));
-                    }
-                    if (!toSendNotificationMessages.isEmpty()) {
-                        this.notificationSenderService.sendNotification(toSendNotificationMessages);
-                    }
+                }
 
+                // Save messages first to get IDs
+                if (!toSaveMessages.isEmpty()) {
+                    this.smsMessageRepository.saveAll(toSaveMessages);
+                    this.smsMessageRepository.flush();
+                    
+                    // Now create queue data with saved message IDs
+                    for (Map.Entry<SmsCampaign, Collection<SmsMessage>> entry : smsDataMap.entrySet()) {
+                        Collection<SmsMessageApiQueueResourceData> apiQueueResourceDatas = new ArrayList<>();
+                        for (SmsMessage smsMessage : entry.getValue()) {
+                            if (!smsMessage.isNotification()) {
+                                SmsMessageApiQueueResourceData apiQueueResourceData = SmsMessageApiQueueResourceData.instance(
+                                    smsMessage.getId(), null, null, null, smsMessage.getMobileNo(), 
+                                    smsMessage.getMessage(), entry.getKey().getProviderId());
+                                apiQueueResourceDatas.add(apiQueueResourceData);
+                            }
+                        }
+                        if (!apiQueueResourceDatas.isEmpty()) {
+                            this.taskExecutor.execute(new SmsTask(apiQueueResourceDatas, ThreadLocalContextUtil.getContext()));
+                        }
+                    }
+                }
+                
+                if (!toSendNotificationMessages.isEmpty()) {
+                    this.notificationSenderService.sendNotification(toSendNotificationMessages);
                 }
             }
         } catch (Exception e) {
-            log.error("Error occured.", e);
+            log.error("Error occurred.", e);
         }
     }
 
