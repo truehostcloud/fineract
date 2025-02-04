@@ -96,14 +96,12 @@ public class SmsMessageScheduledJobServiceImpl implements SmsMessageScheduledJob
                     while (smsMessageIterator.hasNext()) {
                         SmsMessage smsMessage = this.smsMessageRepository.save(smsMessageIterator.next());
                         this.smsMessageRepository.flush();
-                        
                         if (smsMessage.isNotification()) {
                             smsMessage.setStatusType(SmsMessageStatusType.WAITING_FOR_DELIVERY_REPORT.getValue());
                             toSendNotificationMessages.add(smsMessage);
                         } else {
                             SmsMessageApiQueueResourceData apiQueueResourceData = SmsMessageApiQueueResourceData.instance(
                                     smsMessage.getId(), null, null, null, smsMessage.getMobileNo(), smsMessage.getMessage(),
-
                                     entry.getKey().getProviderId());
                             apiQueueResourceDatas.add(apiQueueResourceData);
                             smsMessage.setStatusType(SmsMessageStatusType.WAITING_FOR_DELIVERY_REPORT.getValue());
