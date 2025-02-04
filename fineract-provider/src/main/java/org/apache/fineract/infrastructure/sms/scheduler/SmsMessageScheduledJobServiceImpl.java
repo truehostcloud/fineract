@@ -94,22 +94,23 @@ public class SmsMessageScheduledJobServiceImpl implements SmsMessageScheduledJob
                     Iterator<SmsMessage> smsMessageIterator = entry.getValue().iterator();
                     Collection<SmsMessageApiQueueResourceData> apiQueueResourceDatas = new ArrayList<>();
                     while (smsMessageIterator.hasNext()) {
-                        SmsMessage smsMessage = smsMessageIterator.next();
+                        SmsMessage smsMessage = this.smsMessageRepository.save(smsMessageIterator.next());
+                        this.smsMessageRepository.flush();
+                        
                         if (smsMessage.isNotification()) {
                             smsMessage.setStatusType(SmsMessageStatusType.WAITING_FOR_DELIVERY_REPORT.getValue());
                             toSendNotificationMessages.add(smsMessage);
                         } else {
                             SmsMessageApiQueueResourceData apiQueueResourceData = SmsMessageApiQueueResourceData.instance(
                                     smsMessage.getId(), null, null, null, smsMessage.getMobileNo(), smsMessage.getMessage(),
+
                                     entry.getKey().getProviderId());
                             apiQueueResourceDatas.add(apiQueueResourceData);
                             smsMessage.setStatusType(SmsMessageStatusType.WAITING_FOR_DELIVERY_REPORT.getValue());
                             toSaveMessages.add(smsMessage);
                         }
                     }
-                    if (toSaveMessages.size() > 0) {
-                        this.smsMessageRepository.saveAll(toSaveMessages);
-                        this.smsMessageRepository.flush();
+                    if (!apiQueueResourceDatas.isEmpty()) {
                         this.taskExecutor.execute(new SmsTask(apiQueueResourceDatas, ThreadLocalContextUtil.getContext()));
                     }
                     if (!toSendNotificationMessages.isEmpty()) {
