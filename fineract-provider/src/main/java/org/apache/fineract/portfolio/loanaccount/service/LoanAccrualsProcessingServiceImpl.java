@@ -56,6 +56,7 @@ import org.apache.fineract.infrastructure.event.business.service.BusinessEventNo
 import org.apache.fineract.infrastructure.jobs.exception.JobExecutionException;
 import org.apache.fineract.organisation.monetary.domain.MonetaryCurrency;
 import org.apache.fineract.organisation.monetary.domain.Money;
+import org.apache.fineract.portfolio.loanaccount.data.AccrualBalances;
 import org.apache.fineract.portfolio.loanaccount.data.AccrualChargeData;
 import org.apache.fineract.portfolio.loanaccount.data.AccrualPeriodData;
 import org.apache.fineract.portfolio.loanaccount.data.AccrualPeriodsData;
@@ -128,6 +129,9 @@ public class LoanAccrualsProcessingServiceImpl implements LoanAccrualsProcessing
     @Override
     @Transactional
     public void addPeriodicAccruals(@NotNull LocalDate tillDate, @NotNull Loan loan) {
+        if (loan.isClosed() || loan.getStatus().isOverpaid()) {
+            return;
+        }
         addAccruals(loan, tillDate, true, false, true);
     }
 
@@ -317,7 +321,7 @@ public class LoanAccrualsProcessingServiceImpl implements LoanAccrualsProcessing
             }
         }
 
-        AccrualPeriodsData accrualPeriods = calculateAccrualAmounts(loan, tillDate, periodic);
+        AccrualPeriodsData accrualPeriods = calculateAccrualAmounts(loan, tillDate, periodic, isFinal);
         boolean mergeTransactions = isFinal || progressiveAccrual;
         MonetaryCurrency currency = loan.getLoanProductRelatedDetail().getCurrency();
         List<LoanTransaction> accrualTransactions = new ArrayList<>();
@@ -392,18 +396,21 @@ public class LoanAccrualsProcessingServiceImpl implements LoanAccrualsProcessing
         }
     }
 
-    private AccrualPeriodsData calculateAccrualAmounts(@NotNull Loan loan, @NotNull LocalDate tillDate, boolean periodic) {
+    private AccrualPeriodsData calculateAccrualAmounts(@NotNull Loan loan, @NotNull LocalDate tillDate, boolean periodic, boolean isFinal) {
         boolean chargeOnDueDate = isChargeOnDueDate();
         LoanProductRelatedDetail productDetail = loan.getLoanProductRelatedDetail();
         MonetaryCurrency currency = productDetail.getCurrency();
         LoanScheduleGenerator scheduleGenerator = loanScheduleFactory.create(productDetail.getLoanScheduleType(),
                 productDetail.getInterestMethod());
         int firstInstallmentNumber = fetchFirstNormalInstallmentNumber(loan.getRepaymentScheduleInstallments());
-        List<LoanRepaymentScheduleInstallment> installments = getInstallmentsToAccrue(loan, tillDate, periodic);
+        LocalDate interestCalculationTillDate = loan.isProgressiveSchedule()
+                && loan.getLoanProductRelatedDetail().isInterestRecognitionOnDisbursementDate() ? tillDate.plusDays(1L) : tillDate;
+        List<LoanRepaymentScheduleInstallment> installments = isFinal ? loan.getRepaymentScheduleInstallments()
+                : getInstallmentsToAccrue(loan, interestCalculationTillDate, periodic);
         AccrualPeriodsData accrualPeriods = AccrualPeriodsData.create(installments, firstInstallmentNumber, currency);
         for (LoanRepaymentScheduleInstallment installment : installments) {
-            addInterestAccrual(loan, tillDate, scheduleGenerator, installment, accrualPeriods);
-            addChargeAccrual(loan, tillDate, chargeOnDueDate, installment, accrualPeriods);
+            addInterestAccrual(loan, interestCalculationTillDate, scheduleGenerator, installment, accrualPeriods);
+            addChargeAccrual(loan, tillDate, chargeOnDueDate, installment, accrualPeriods, isFinal);
         }
         return accrualPeriods;
     }
@@ -430,7 +437,7 @@ public class LoanAccrualsProcessingServiceImpl implements LoanAccrualsProcessing
         boolean isPastPeriod = isAfterPeriod(tillDate, installment);
         boolean isInPeriod = isInPeriod(tillDate, installment, false);
         if (isPastPeriod || loan.isClosed() || loan.isOverPaid()) {
-            interest = installment.getInterestCharged(currency);
+            interest = installment.getInterestCharged(currency).minus(installment.getCreditedInterest());
         } else {
             if (isInPeriod) { // first period first day is not accrued
                 interest = scheduleGenerator.getPeriodInterestTillDate(installment, tillDate);
@@ -509,12 +516,12 @@ public class LoanAccrualsProcessingServiceImpl implements LoanAccrualsProcessing
     }
 
     private void addChargeAccrual(@NotNull Loan loan, @NotNull LocalDate tillDate, boolean chargeOnDueDate,
-            @NotNull LoanRepaymentScheduleInstallment installment, @NotNull AccrualPeriodsData accrualPeriods) {
+            @NotNull LoanRepaymentScheduleInstallment installment, @NotNull AccrualPeriodsData accrualPeriods, boolean isFinal) {
         AccrualPeriodData period = accrualPeriods.getPeriodByInstallmentNumber(installment.getInstallmentNumber());
         LocalDate dueDate = installment.getDueDate();
-        List<LoanCharge> loanCharges = loan
-                .getLoanCharges(lc -> !lc.isDueAtDisbursement() && (lc.isInstalmentFee() ? !DateUtils.isBefore(tillDate, dueDate)
-                        : isChargeDue(lc, tillDate, chargeOnDueDate, installment, period.isFirstPeriod())));
+        Collection<LoanCharge> loanCharges;
+        loanCharges = loan.getLoanCharges(lc -> !lc.isDueAtDisbursement() && (lc.isInstalmentFee() ? !DateUtils.isBefore(tillDate, dueDate)
+                : isChargeDue(lc, tillDate, chargeOnDueDate, installment, period.isFirstPeriod())));
         for (LoanCharge loanCharge : loanCharges) {
             addChargeAccrual(loanCharge, tillDate, chargeOnDueDate, installment, accrualPeriods);
         }
@@ -593,6 +600,7 @@ public class LoanAccrualsProcessingServiceImpl implements LoanAccrualsProcessing
         LocalDate fromDate = installment.getFromDate();
         LocalDate dueDate = installment.getDueDate();
         LocalDate toDate = DateUtils.isBefore(dueDate, tillDate) ? dueDate : tillDate;
+        chargeOnDueDate = chargeOnDueDate || loanCharge.getDueLocalDate().isBefore(loanCharge.getSubmittedOnDate());
         return chargeOnDueDate ? loanCharge.isDueInPeriod(fromDate, toDate, isFirstPeriod)
                 : isInPeriod(loanCharge.getSubmittedOnDate(), fromDate, toDate, isFirstPeriod);
     }
@@ -698,13 +706,52 @@ public class LoanAccrualsProcessingServiceImpl implements LoanAccrualsProcessing
         LoanRepaymentScheduleInstallment lastInstallment = loan.getLastLoanRepaymentScheduleInstallment();
         LocalDate lastDueDate = lastInstallment.getDueDate();
         if (isProgressiveAccrual(loan)) {
-            AccrualPeriodsData accrualPeriods = calculateAccrualAmounts(loan, lastDueDate, true);
-            for (AccrualPeriodData period : accrualPeriods.getPeriods()) {
-                Money interestAccrued = period.getTransactionAccrued();
-                Money feeAccrued = period.getFeeTransactionAccrued();
-                Money penaltyAccrued = period.getPenaltyTransactionAccrued();
-                LoanRepaymentScheduleInstallment installment = loan.fetchRepaymentScheduleInstallment(period.getInstallmentNumber());
-                installment.updateAccrualPortion(interestAccrued, feeAccrued, penaltyAccrued);
+            AccrualBalances accrualBalances = new AccrualBalances();
+            accrualTransactions.forEach(lt -> {
+                switch (lt.getTypeOf()) {
+                    case ACCRUAL -> {
+                        accrualBalances.setFeePortion(MathUtil.add(accrualBalances.getFeePortion(), lt.getFeeChargesPortion()));
+                        accrualBalances.setPenaltyPortion(MathUtil.add(accrualBalances.getPenaltyPortion(), lt.getPenaltyChargesPortion()));
+                        accrualBalances.setInterestPortion(MathUtil.add(accrualBalances.getInterestPortion(), lt.getInterestPortion()));
+                    }
+                    case ACCRUAL_ADJUSTMENT -> {
+                        accrualBalances.setFeePortion(MathUtil.subtract(accrualBalances.getFeePortion(), lt.getFeeChargesPortion()));
+                        accrualBalances
+                                .setPenaltyPortion(MathUtil.subtract(accrualBalances.getPenaltyPortion(), lt.getPenaltyChargesPortion()));
+                        accrualBalances
+                                .setInterestPortion(MathUtil.subtract(accrualBalances.getInterestPortion(), lt.getInterestPortion()));
+                    }
+                    default -> throw new IllegalStateException("Unexpected value: " + lt.getTypeOf());
+                }
+            });
+            for (LoanRepaymentScheduleInstallment installment : loan.getRepaymentScheduleInstallments()) {
+                BigDecimal maximumAccruableInterest = MathUtil.nullToZero(installment.getInterestCharged());
+                BigDecimal maximumAccruableFee = MathUtil.nullToZero(installment.getFeeChargesCharged());
+                BigDecimal maximumAccruablePenalty = MathUtil.nullToZero(installment.getPenaltyCharges());
+
+                if (MathUtil.isLessThanOrEqualTo(maximumAccruableInterest, accrualBalances.getInterestPortion())) {
+                    installment.setInterestAccrued(maximumAccruableInterest);
+                    accrualBalances.setInterestPortion(accrualBalances.getInterestPortion().subtract(maximumAccruableInterest));
+                } else {
+                    installment.setInterestAccrued(accrualBalances.getInterestPortion());
+                    accrualBalances.setInterestPortion(BigDecimal.ZERO);
+                }
+
+                if (MathUtil.isLessThanOrEqualTo(maximumAccruableFee, accrualBalances.getFeePortion())) {
+                    installment.setFeeAccrued(maximumAccruableFee);
+                    accrualBalances.setFeePortion(accrualBalances.getFeePortion().subtract(maximumAccruableFee));
+                } else {
+                    installment.setFeeAccrued(accrualBalances.getFeePortion());
+                    accrualBalances.setFeePortion(BigDecimal.ZERO);
+                }
+
+                if (MathUtil.isLessThanOrEqualTo(maximumAccruablePenalty, accrualBalances.getPenaltyPortion())) {
+                    installment.setPenaltyAccrued(maximumAccruablePenalty);
+                    accrualBalances.setPenaltyPortion(accrualBalances.getPenaltyPortion().subtract(maximumAccruablePenalty));
+                } else {
+                    installment.setPenaltyAccrued(accrualBalances.getPenaltyPortion());
+                    accrualBalances.setPenaltyPortion(BigDecimal.ZERO);
+                }
             }
         } else {
             List<LoanRepaymentScheduleInstallment> installments = loan.getRepaymentScheduleInstallments();

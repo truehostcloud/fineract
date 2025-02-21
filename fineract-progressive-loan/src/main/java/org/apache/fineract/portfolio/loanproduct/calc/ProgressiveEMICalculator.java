@@ -18,16 +18,20 @@
  */
 package org.apache.fineract.portfolio.loanproduct.calc;
 
+import jakarta.annotation.Nonnull;
 import jakarta.validation.constraints.NotNull;
 import java.math.BigDecimal;
 import java.math.MathContext;
 import java.time.LocalDate;
 import java.time.Year;
+import java.time.temporal.ChronoUnit;
+import java.time.temporal.TemporalAdjusters;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
+import java.util.function.Predicate;
 import lombok.RequiredArgsConstructor;
 import org.apache.fineract.infrastructure.core.service.DateUtils;
 import org.apache.fineract.infrastructure.core.service.MathUtil;
@@ -35,15 +39,17 @@ import org.apache.fineract.organisation.monetary.domain.Money;
 import org.apache.fineract.portfolio.common.domain.DaysInMonthType;
 import org.apache.fineract.portfolio.common.domain.DaysInYearType;
 import org.apache.fineract.portfolio.common.domain.PeriodFrequencyType;
-import org.apache.fineract.portfolio.loanaccount.data.LoanTermVariationsDataWrapper;
+import org.apache.fineract.portfolio.loanaccount.data.LoanTermVariationsData;
 import org.apache.fineract.portfolio.loanaccount.domain.LoanRepaymentScheduleInstallment;
-import org.apache.fineract.portfolio.loanaccount.loanschedule.data.EmiAdjustment;
-import org.apache.fineract.portfolio.loanaccount.loanschedule.data.InterestPeriod;
-import org.apache.fineract.portfolio.loanaccount.loanschedule.data.OutstandingDetails;
-import org.apache.fineract.portfolio.loanaccount.loanschedule.data.PeriodDueDetails;
-import org.apache.fineract.portfolio.loanaccount.loanschedule.data.ProgressiveLoanInterestScheduleModel;
-import org.apache.fineract.portfolio.loanaccount.loanschedule.data.RepaymentPeriod;
+import org.apache.fineract.portfolio.loanaccount.domain.LoanTermVariationType;
 import org.apache.fineract.portfolio.loanaccount.loanschedule.domain.LoanScheduleModelRepaymentPeriod;
+import org.apache.fineract.portfolio.loanproduct.calc.data.EmiAdjustment;
+import org.apache.fineract.portfolio.loanproduct.calc.data.EmiChangeOperation;
+import org.apache.fineract.portfolio.loanproduct.calc.data.InterestPeriod;
+import org.apache.fineract.portfolio.loanproduct.calc.data.OutstandingDetails;
+import org.apache.fineract.portfolio.loanproduct.calc.data.PeriodDueDetails;
+import org.apache.fineract.portfolio.loanproduct.calc.data.ProgressiveLoanInterestScheduleModel;
+import org.apache.fineract.portfolio.loanproduct.calc.data.RepaymentPeriod;
 import org.apache.fineract.portfolio.loanproduct.domain.LoanProductMinimumRepaymentScheduleRelatedDetail;
 import org.springframework.stereotype.Component;
 
@@ -58,7 +64,7 @@ public final class ProgressiveEMICalculator implements EMICalculator {
     @NotNull
     public ProgressiveLoanInterestScheduleModel generatePeriodInterestScheduleModel(@NotNull List<LoanScheduleModelRepaymentPeriod> periods,
             @NotNull LoanProductMinimumRepaymentScheduleRelatedDetail loanProductRelatedDetail,
-            LoanTermVariationsDataWrapper loanTermVariations, final Integer installmentAmountInMultiplesOf, final MathContext mc) {
+            List<LoanTermVariationsData> loanTermVariations, final Integer installmentAmountInMultiplesOf, final MathContext mc) {
         return generateInterestScheduleModel(periods, LoanScheduleModelRepaymentPeriod::periodFromDate,
                 LoanScheduleModelRepaymentPeriod::periodDueDate, loanProductRelatedDetail, loanTermVariations,
                 installmentAmountInMultiplesOf, mc);
@@ -69,7 +75,7 @@ public final class ProgressiveEMICalculator implements EMICalculator {
     public ProgressiveLoanInterestScheduleModel generateInstallmentInterestScheduleModel(
             @NotNull List<LoanRepaymentScheduleInstallment> installments,
             @NotNull LoanProductMinimumRepaymentScheduleRelatedDetail loanProductRelatedDetail,
-            LoanTermVariationsDataWrapper loanTermVariations, final Integer installmentAmountInMultiplesOf, final MathContext mc) {
+            List<LoanTermVariationsData> loanTermVariations, final Integer installmentAmountInMultiplesOf, final MathContext mc) {
         installments = installments.stream().filter(installment -> !installment.isDownPayment() && !installment.isAdditional()).toList();
         return generateInterestScheduleModel(installments, LoanRepaymentScheduleInstallment::getFromDate,
                 LoanRepaymentScheduleInstallment::getDueDate, loanProductRelatedDetail, loanTermVariations, installmentAmountInMultiplesOf,
@@ -79,11 +85,11 @@ public final class ProgressiveEMICalculator implements EMICalculator {
     @NotNull
     private <T> ProgressiveLoanInterestScheduleModel generateInterestScheduleModel(@NotNull List<T> periods, Function<T, LocalDate> from,
             Function<T, LocalDate> to, @NotNull LoanProductMinimumRepaymentScheduleRelatedDetail loanProductRelatedDetail,
-            LoanTermVariationsDataWrapper loanTermVariations, final Integer installmentAmountInMultiplesOf, final MathContext mc) {
+            List<LoanTermVariationsData> loanTermVariations, final Integer installmentAmountInMultiplesOf, final MathContext mc) {
         final Money zero = Money.zero(loanProductRelatedDetail.getCurrencyData(), mc);
         final AtomicReference<RepaymentPeriod> prev = new AtomicReference<>();
         List<RepaymentPeriod> repaymentPeriods = periods.stream().map(e -> {
-            RepaymentPeriod rp = new RepaymentPeriod(prev.get(), from.apply(e), to.apply(e), zero, mc);
+            RepaymentPeriod rp = RepaymentPeriod.create(prev.get(), from.apply(e), to.apply(e), zero, mc);
             prev.set(rp);
             return rp;
         }).toList();
@@ -185,13 +191,60 @@ public final class ProgressiveEMICalculator implements EMICalculator {
         repaymentPeriod.ifPresent(rp -> {
             // If any period total paid > calculated EMI, then set EMI to total paid -> effectively it is marked as
             // fully paid
-            if (rp.getTotalPaidAmount().compareTo(rp.getEmi()) > 0) {
-                rp.setEmi(rp.getTotalPaidAmount());
+            if (rp.getTotalPaidAmount().isGreaterThan(rp.getEmiPlusChargeback())) {
+                rp.setEmi(rp.getTotalPaidAmount().minus(rp.getTotalChargebackAmount()));
                 calculateLastUnpaidRepaymentPeriodEMI(scheduleModel);
             }
         });
     }
 
+    private void addChargebackAmountsToInterestPeriod(ProgressiveLoanInterestScheduleModel scheduleModel, LocalDate transactionDate,
+            Money chargebackPrincipalAmount, Money chargeBackInterestAmount) {
+        scheduleModel.repaymentPeriods().stream().filter(checkRepaymentPeriodIsInChargebackRange(scheduleModel, transactionDate))
+                .findFirst()
+                .flatMap(repaymentPeriod -> repaymentPeriod.getInterestPeriods().stream()
+                        .filter(interestPeriod -> interestPeriod.getFromDate().equals(transactionDate)).reduce((v1, v2) -> v2))
+                .ifPresent(interestPeriod -> {
+                    interestPeriod.addChargebackPrincipalAmount(chargebackPrincipalAmount);
+                    interestPeriod.addChargebackInterestAmount(chargeBackInterestAmount);
+                });
+    }
+
+    @Nonnull
+    private static Predicate<RepaymentPeriod> checkRepaymentPeriodIsInChargebackRange(ProgressiveLoanInterestScheduleModel scheduleModel,
+            LocalDate transactionDate) {
+        return repaymentPeriod -> scheduleModel.isLastRepaymentPeriod(repaymentPeriod)
+                ? !transactionDate.isBefore(repaymentPeriod.getFromDate()) && !transactionDate.isAfter(repaymentPeriod.getDueDate())
+                : !transactionDate.isBefore(repaymentPeriod.getFromDate()) && transactionDate.isBefore(repaymentPeriod.getDueDate());
+    }
+
+    @Override
+    public void chargebackPrincipal(ProgressiveLoanInterestScheduleModel scheduleModel, LocalDate transactionDate,
+            Money chargebackPrincipalAmount) {
+        addChargeback(scheduleModel, transactionDate, chargebackPrincipalAmount, scheduleModel.zero());
+    }
+
+    @Override
+    public void chargebackInterest(ProgressiveLoanInterestScheduleModel scheduleModel, LocalDate transactionDate,
+            Money chargebackInterestAmount) {
+        addChargeback(scheduleModel, transactionDate, scheduleModel.zero(), chargebackInterestAmount);
+    }
+
+    private void addChargeback(ProgressiveLoanInterestScheduleModel scheduleModel, LocalDate transactionDate,
+            Money chargebackPrincipalAmount, Money chargebackInterestAmount) {
+        scheduleModel.changeOutstandingBalanceAndUpdateInterestPeriods(transactionDate, scheduleModel.zero(), chargebackPrincipalAmount)
+                .ifPresent(repaymentPeriod -> {
+                    addChargebackAmountsToInterestPeriod(scheduleModel, transactionDate, chargebackPrincipalAmount,
+                            chargebackInterestAmount);
+                    calculateRateFactorForRepaymentPeriod(repaymentPeriod, scheduleModel);
+                    calculateOutstandingBalance(scheduleModel);
+                    calculateLastUnpaidRepaymentPeriodEMI(scheduleModel);
+                });
+    }
+
+    /**
+     * This method gives back the maximum of the due principal and maximum of the due interest for a requested day.
+     */
     @Override
     @NotNull
     public PeriodDueDetails getDueAmounts(@NotNull ProgressiveLoanInterestScheduleModel scheduleModel, @NotNull LocalDate periodDueDate,
@@ -213,11 +266,13 @@ public final class ProgressiveEMICalculator implements EMICalculator {
     @Override
     @NotNull
     public Money getPeriodInterestTillDate(@NotNull ProgressiveLoanInterestScheduleModel scheduleModel, @NotNull LocalDate periodDueDate,
-            @NotNull LocalDate targetDate) {
+            @NotNull LocalDate targetDate, boolean includeChargebackInterest) {
         ProgressiveLoanInterestScheduleModel recalculatedScheduleModelTillDate = recalculateScheduleModelTillDate(scheduleModel,
                 periodDueDate, targetDate);
         RepaymentPeriod repaymentPeriod = recalculatedScheduleModelTillDate.findRepaymentPeriodByDueDate(periodDueDate).orElseThrow();
-        return repaymentPeriod.getCalculatedDueInterest();
+        return includeChargebackInterest ? repaymentPeriod.getCalculatedDueInterest()
+                : repaymentPeriod.getCalculatedDueInterest().minus(repaymentPeriod.getChargebackInterest(),
+                        recalculatedScheduleModelTillDate.mc());
     }
 
     @Override
@@ -258,6 +313,17 @@ public final class ProgressiveEMICalculator implements EMICalculator {
         return new OutstandingDetails(totalOutstandingPrincipal, totalOutstandingInterest);
     }
 
+    @Override
+    public void calculateRateFactorForRepaymentPeriod(final RepaymentPeriod repaymentPeriod,
+            final ProgressiveLoanInterestScheduleModel scheduleModel) {
+        repaymentPeriod.getInterestPeriods().forEach(interestPeriod -> {
+            interestPeriod.setRateFactor(calculateRateFactorPerPeriod(scheduleModel, repaymentPeriod, interestPeriod.getFromDate(),
+                    interestPeriod.getDueDate()));
+            interestPeriod.setRateFactorTillPeriodDueDate(calculateRateFactorPerPeriodForInterest(scheduleModel, repaymentPeriod,
+                    interestPeriod.getFromDate(), repaymentPeriod.getDueDate()));
+        });
+    }
+
     @NotNull
     private ProgressiveLoanInterestScheduleModel recalculateScheduleModelTillDate(
             @NotNull ProgressiveLoanInterestScheduleModel scheduleModel, @NotNull LocalDate periodDueDate, @NotNull LocalDate targetDate) {
@@ -274,20 +340,25 @@ public final class ProgressiveEMICalculator implements EMICalculator {
             interestPeriod = repaymentPeriod.getLastInterestPeriod();
             adjustedTargetDate = repaymentPeriod.getDueDate();
         } else {
-            // TODO use findInterestPeriod
-            interestPeriod = repaymentPeriod.getInterestPeriods().stream()
-                    .filter(ip -> targetDate.isAfter(ip.getFromDate()) && !targetDate.isAfter(ip.getDueDate())).findFirst().orElseThrow();
+            interestPeriod = repaymentPeriod.findInterestPeriod(targetDate).orElseThrow();
         }
         // TODO use findInterestPeriod
-        scheduleModelCopy.repaymentPeriods().stream()//
-                .filter(rp -> targetDate.isAfter(rp.getFromDate()) && !targetDate.isAfter(rp.getDueDate())).findFirst()//
-                .flatMap(rp -> rp.getInterestPeriods().stream()//
-                        .filter(ip -> targetDate.isAfter(ip.getFromDate()) && !targetDate.isAfter(ip.getDueDate())) //
-                        .reduce((one, two) -> two))
-                .ifPresent(ip -> ip.setDueDate(targetDate)); //
+        scheduleModelCopy.findRepaymentPeriod(targetDate)//
+                .flatMap(rp -> rp.findInterestPeriod(targetDate)).ifPresent(ip -> ip.setDueDate(targetDate)); //
         interestPeriod.setDueDate(adjustedTargetDate);
         int index = repaymentPeriod.getInterestPeriods().indexOf(interestPeriod);
-        repaymentPeriod.getInterestPeriods().subList(index + 1, repaymentPeriod.getInterestPeriods().size()).clear();
+        int nextIdx = index + 1;
+        boolean thereIsInterestPeriodFromDateOnTargetDate = repaymentPeriod.getInterestPeriods().size() > nextIdx
+                && repaymentPeriod.getInterestPeriods().get(nextIdx).getFromDate().isEqual(targetDate);
+        if (thereIsInterestPeriodFromDateOnTargetDate) {
+            // NOTE: If there is a next interest period with fromDate on the target date
+            // then the related chargeback amounts comes from the next interest period too.
+            InterestPeriod nextInterestPeriod = repaymentPeriod.getInterestPeriods().get(nextIdx);
+            interestPeriod.addChargebackPrincipalAmount(nextInterestPeriod.getChargebackPrincipal());
+            interestPeriod.addChargebackInterestAmount(nextInterestPeriod.getChargebackInterest());
+        }
+
+        repaymentPeriod.getInterestPeriods().subList(nextIdx, repaymentPeriod.getInterestPeriods().size()).clear();
         scheduleModelCopy.repaymentPeriods().forEach(rp -> rp.getInterestPeriods().removeIf(ip -> ip.getDueDate().isAfter(targetDate)));
         calculateRateFactorForPeriods(scheduleModelCopy.repaymentPeriods(), scheduleModelCopy);
         calculateOutstandingBalance(scheduleModelCopy);
@@ -303,19 +374,19 @@ public final class ProgressiveEMICalculator implements EMICalculator {
             final ProgressiveLoanInterestScheduleModel scheduleModel, final EmiChangeOperation operation) {
         final List<RepaymentPeriod> relatedRepaymentPeriods = scheduleModel.getRelatedRepaymentPeriods(calculateFromRepaymentPeriodDueDate);
         final boolean onlyOnActualModelShouldApply = scheduleModel.isEmpty()
-                || operation.getAction() == EmiChangeOperation.Action.INTEREST_RATE_CHANGE;
+                || operation.getAction() == EmiChangeOperation.Action.INTEREST_RATE_CHANGE || scheduleModel.isCopiedForCalculation();
 
         calculateRateFactorForPeriods(relatedRepaymentPeriods, scheduleModel);
         calculateOutstandingBalance(scheduleModel);
         if (onlyOnActualModelShouldApply) {
             calculateEMIOnActualModel(relatedRepaymentPeriods, scheduleModel);
         } else {
-            calculateEMIOnNewEmptyModelAndMerge(relatedRepaymentPeriods, scheduleModel, operation);
+            calculateEMIOnNewModelAndMerge(relatedRepaymentPeriods, scheduleModel, operation);
         }
         calculateOutstandingBalance(scheduleModel);
         calculateLastUnpaidRepaymentPeriodEMI(scheduleModel);
-        if (onlyOnActualModelShouldApply
-                && (scheduleModel.loanTermVariations() == null || scheduleModel.loanTermVariations().getDueDateVariation().isEmpty())) {
+        if (onlyOnActualModelShouldApply && (scheduleModel.loanTermVariations() == null
+                || scheduleModel.loanTermVariations().get(LoanTermVariationType.DUE_DATE) == null)) {
             checkAndAdjustEmiIfNeededOnRelatedRepaymentPeriods(scheduleModel, relatedRepaymentPeriods);
         }
     }
@@ -324,19 +395,21 @@ public final class ProgressiveEMICalculator implements EMICalculator {
         MathContext mc = scheduleModel.mc();
         Money totalDueInterest = scheduleModel.repaymentPeriods().stream().map(RepaymentPeriod::getDueInterest).reduce(scheduleModel.zero(),
                 (m1, m2) -> m1.plus(m2, mc)); // 1.46
-        Money totalEMI = scheduleModel.repaymentPeriods().stream().map(RepaymentPeriod::getEmi).reduce(scheduleModel.zero(),
+        Money totalEMI = scheduleModel.repaymentPeriods().stream().map(RepaymentPeriod::getEmiPlusChargeback).reduce(scheduleModel.zero(),
                 (m1, m2) -> m1.plus(m2, mc)); // 101.48
         Money totalDisbursedAmount = scheduleModel.repaymentPeriods().stream()
                 .flatMap(rp -> rp.getInterestPeriods().stream().map(InterestPeriod::getDisbursementAmount))
-                .reduce(scheduleModel.zero(), (m1, m2) -> m1.plus(m2, mc)); // 100
+                .reduce(scheduleModel.zero(), (m1, m2) -> m1.plus(m2, mc)) // 100
+                .plus(scheduleModel.getTotalChargebackPrincipal(), mc); //
 
         Money diff = totalDisbursedAmount.plus(totalDueInterest, mc).minus(totalEMI, mc);
         Optional<RepaymentPeriod> findLastUnpaidRepaymentPeriod = scheduleModel.repaymentPeriods().stream().filter(rp -> !rp.isFullyPaid())
                 .reduce((first, second) -> second);
         findLastUnpaidRepaymentPeriod.ifPresent(repaymentPeriod -> {
             repaymentPeriod.setEmi(repaymentPeriod.getEmi().add(diff, mc));
-            if (repaymentPeriod.getEmi().isLessThan(repaymentPeriod.getTotalPaidAmount())) {
-                repaymentPeriod.setEmi(repaymentPeriod.getTotalPaidAmount());
+            if (repaymentPeriod.getEmi()
+                    .isLessThan(repaymentPeriod.getTotalPaidAmount().minus(repaymentPeriod.getTotalChargebackAmount(), mc))) {
+                repaymentPeriod.setEmi(repaymentPeriod.getTotalPaidAmount().minus(repaymentPeriod.getTotalChargebackAmount(), mc));
                 calculateLastUnpaidRepaymentPeriodEMI(scheduleModel);
             }
         });
@@ -416,22 +489,119 @@ public final class ProgressiveEMICalculator implements EMICalculator {
         repaymentPeriods.forEach(repaymentPeriod -> calculateRateFactorForRepaymentPeriod(repaymentPeriod, scheduleModel));
     }
 
-    private void calculateRateFactorForRepaymentPeriod(final RepaymentPeriod repaymentPeriod,
-            final ProgressiveLoanInterestScheduleModel scheduleModel) {
-        repaymentPeriod.getInterestPeriods().forEach(interestPeriod -> {
-            interestPeriod.setRateFactor(calculateRateFactorPerPeriod(scheduleModel, repaymentPeriod, interestPeriod.getFromDate(),
-                    interestPeriod.getDueDate(), false));
-            interestPeriod.setRateFactorTillPeriodDueDate(calculateRateFactorPerPeriod(scheduleModel, repaymentPeriod,
-                    interestPeriod.getFromDate(), repaymentPeriod.getDueDate(), true));
-        });
+    BigDecimal calculateRateFactorPerPeriodForInterest(final ProgressiveLoanInterestScheduleModel scheduleModel,
+            final RepaymentPeriod repaymentPeriod, final LocalDate interestPeriodFromDate, final LocalDate interestPeriodDueDate) {
+        final MathContext mc = scheduleModel.mc();
+        final LoanProductMinimumRepaymentScheduleRelatedDetail loanProductRelatedDetail = scheduleModel.loanProductRelatedDetail();
+        final BigDecimal interestRate = calcNominalInterestRatePercentage(scheduleModel.getInterestRate(interestPeriodFromDate),
+                scheduleModel.mc());
+        final DaysInYearType daysInYearType = DaysInYearType.fromInt(loanProductRelatedDetail.getDaysInYearType());
+        final DaysInMonthType daysInMonthType = DaysInMonthType.fromInt(loanProductRelatedDetail.getDaysInMonthType());
+        final PeriodFrequencyType repaymentFrequency = loanProductRelatedDetail.getRepaymentPeriodFrequencyType();
+
+        BigDecimal daysInYear = BigDecimal.valueOf(daysInYearType.getNumberOfDays(interestPeriodFromDate));
+        final BigDecimal actualDaysInPeriod = BigDecimal
+                .valueOf(DateUtils.getDifferenceInDays(interestPeriodFromDate, interestPeriodDueDate));
+        final BigDecimal calculatedDaysInPeriod = BigDecimal
+                .valueOf(DateUtils.getDifferenceInDays(repaymentPeriod.getFromDate(), repaymentPeriod.getDueDate()));
+        final int numberOfYearsDifferenceInPeriod = interestPeriodDueDate.getYear() - interestPeriodFromDate.getYear();
+        final boolean partialPeriodCalculationNeeded = daysInYearType == DaysInYearType.ACTUAL && numberOfYearsDifferenceInPeriod > 0;
+
+        // TODO check: loanApplicationTerms.calculatePeriodsBetweenDates(startDate, endDate); // calculate period data
+        // TODO review: (repayment frequency: days, weeks, years; validation day is month fix 30)
+        // TODO refactor this logic to represent in interest period
+        if (partialPeriodCalculationNeeded) {
+            final BigDecimal cumulatedPeriodFractions = calculatePeriodFractions(scheduleModel, interestPeriodFromDate,
+                    interestPeriodDueDate, mc);
+            return rateFactorByRepaymentPartialPeriod(interestRate, BigDecimal.ONE, cumulatedPeriodFractions, BigDecimal.ONE,
+                    BigDecimal.ONE, mc);
+        }
+
+        if (daysInMonthType.equals(DaysInMonthType.ACTUAL)) {
+            return rateFactorByRepaymentPeriod(interestRate, actualDaysInPeriod, BigDecimal.ONE, daysInYear, BigDecimal.ONE, BigDecimal.ONE,
+                    mc);
+        } else if (daysInMonthType.isDaysInMonth_30()) {
+            BigDecimal periodRatio = switch (repaymentFrequency) {
+                case YEARS -> calculatePeriodRatio(scheduleModel, repaymentPeriod, ChronoUnit.YEARS, mc);
+                case MONTHS -> calculatePeriodRatio(scheduleModel, repaymentPeriod, ChronoUnit.MONTHS, mc);
+                case WEEKS -> calculatePeriodRatio(scheduleModel, repaymentPeriod, ChronoUnit.WEEKS, mc);
+                case DAYS -> calculatePeriodRatio(scheduleModel, repaymentPeriod, ChronoUnit.DAYS, mc);
+                default -> throw new UnsupportedOperationException("Unsupported repayment frequency: " + repaymentFrequency);
+            };
+
+            return calculateRateFactorPerPeriodBasedOnRepaymentFrequency(interestRate, repaymentFrequency, periodRatio,
+                    BigDecimal.valueOf(30), daysInYear, actualDaysInPeriod, calculatedDaysInPeriod, mc);
+        }
+        throw new UnsupportedOperationException(
+                "Unsupported combination: Days in year: " + daysInYearType + ", days in month: " + daysInMonthType);
+    }
+
+    private static BigDecimal calculatePeriodRatio(ProgressiveLoanInterestScheduleModel scheduleModel, RepaymentPeriod repaymentPeriod,
+            ChronoUnit chronoUnit, MathContext mc) {
+
+        LocalDate seedDate = calculateSeedDate(scheduleModel, repaymentPeriod);
+        int numberOfPeriodBetweenSeedDateAndActualRepaymentPeriod = switch (chronoUnit) {
+            case DAYS, WEEKS, YEARS -> DateUtils.getExactDifference(seedDate, repaymentPeriod.getFromDate(), chronoUnit);
+            case MONTHS -> {
+                int seedDateDay = seedDate.getDayOfMonth();
+                int targetDateDay = repaymentPeriod.getFromDate().getDayOfMonth();
+                int targetDateLastDay = ((LocalDate) TemporalAdjusters.lastDayOfMonth().adjustInto(repaymentPeriod.getFromDate()))
+                        .getDayOfMonth();
+                // In case target date is the last day of the month and the seed date day is later than the target date
+                // day, we need to move it by 1 days
+                if (targetDateLastDay == targetDateDay && seedDateDay > targetDateDay) {
+                    yield DateUtils.getExactDifference(seedDate, repaymentPeriod.getFromDate().plusDays(1), chronoUnit);
+                } else {
+                    yield DateUtils.getExactDifference(seedDate, repaymentPeriod.getFromDate(), chronoUnit);
+                }
+            }
+            default -> throw new UnsupportedOperationException("Unsupported chrono unit: " + chronoUnit);
+        };
+
+        int multiplicator = numberOfPeriodBetweenSeedDateAndActualRepaymentPeriod + 1;
+        LocalDate fromDate = repaymentPeriod.getFromDate();
+        while (fromDate.isBefore(repaymentPeriod.getDueDate())) {
+            fromDate = seedDate.plus(multiplicator, chronoUnit);
+            if (!fromDate.isAfter(repaymentPeriod.getDueDate())) {
+                multiplicator++;
+            } else {
+                LocalDate fullPeriodDate = fromDate;
+                multiplicator = multiplicator - numberOfPeriodBetweenSeedDateAndActualRepaymentPeriod - 1;
+                fromDate = seedDate.plus(multiplicator, chronoUnit);
+                final long differenceInDays = DateUtils.getDifferenceInDays(fromDate, repaymentPeriod.getDueDate());
+                final long fullPeriodDifferenceInDays = DateUtils.getDifferenceInDays(fromDate, fullPeriodDate);
+                return BigDecimal.valueOf(differenceInDays).divide(BigDecimal.valueOf(fullPeriodDifferenceInDays), mc)
+                        .add(BigDecimal.valueOf(multiplicator));
+            }
+        }
+        multiplicator = multiplicator - numberOfPeriodBetweenSeedDateAndActualRepaymentPeriod - 1;
+        return BigDecimal.valueOf(multiplicator);
+    }
+
+    private static LocalDate calculateSeedDate(ProgressiveLoanInterestScheduleModel scheduleModel, RepaymentPeriod repaymentPeriod) {
+        LocalDate seedDate = scheduleModel.getStartDate();
+        LocalDate calculatedDate;
+        int multiplicator = 1;
+        ChronoUnit chronoUnit = switch (scheduleModel.loanProductRelatedDetail().getRepaymentPeriodFrequencyType()) {
+            case YEARS -> ChronoUnit.YEARS;
+            case MONTHS -> ChronoUnit.MONTHS;
+            case WEEKS -> ChronoUnit.WEEKS;
+            case DAYS -> ChronoUnit.DAYS;
+            default -> throw new UnsupportedOperationException(
+                    "Unsupported repayment frequency: " + scheduleModel.loanProductRelatedDetail().getRepaymentPeriodFrequencyType());
+        };
+        do {
+            calculatedDate = seedDate.plus(multiplicator, chronoUnit);
+            multiplicator++;
+        } while (calculatedDate.isBefore(repaymentPeriod.getDueDate()));
+        return calculatedDate.equals(repaymentPeriod.getDueDate()) ? seedDate : repaymentPeriod.getFromDate();
     }
 
     /**
      * Calculate Rate Factor for an exact Period
      */
     private BigDecimal calculateRateFactorPerPeriod(final ProgressiveLoanInterestScheduleModel scheduleModel,
-            final RepaymentPeriod repaymentPeriod, final LocalDate interestPeriodFromDate, final LocalDate interestPeriodDueDate,
-            final boolean isTillDate) {
+            final RepaymentPeriod repaymentPeriod, final LocalDate interestPeriodFromDate, final LocalDate interestPeriodDueDate) {
         final MathContext mc = scheduleModel.mc();
         final LoanProductMinimumRepaymentScheduleRelatedDetail loanProductRelatedDetail = scheduleModel.loanProductRelatedDetail();
         final BigDecimal interestRate = calcNominalInterestRatePercentage(scheduleModel.getInterestRate(interestPeriodFromDate),
@@ -441,60 +611,76 @@ public final class ProgressiveEMICalculator implements EMICalculator {
         final PeriodFrequencyType repaymentFrequency = loanProductRelatedDetail.getRepaymentPeriodFrequencyType();
         final BigDecimal repaymentEvery = BigDecimal.valueOf(loanProductRelatedDetail.getRepayEvery());
 
-        final BigDecimal daysInMonth = BigDecimal.valueOf(daysInMonthType.getNumberOfDays(interestPeriodFromDate));
-        final BigDecimal daysInYear = BigDecimal.valueOf(daysInYearType.getNumberOfDays(interestPeriodFromDate));
+        BigDecimal daysInYear = BigDecimal.valueOf(daysInYearType.getNumberOfDays(interestPeriodFromDate));
         final BigDecimal actualDaysInPeriod = BigDecimal
                 .valueOf(DateUtils.getDifferenceInDays(interestPeriodFromDate, interestPeriodDueDate));
         final BigDecimal calculatedDaysInPeriod = BigDecimal
                 .valueOf(DateUtils.getDifferenceInDays(repaymentPeriod.getFromDate(), repaymentPeriod.getDueDate()));
         final int numberOfYearsDifferenceInPeriod = interestPeriodDueDate.getYear() - interestPeriodFromDate.getYear();
         final boolean partialPeriodCalculationNeeded = daysInYearType == DaysInYearType.ACTUAL && numberOfYearsDifferenceInPeriod > 0;
-
-        long addedDays = !isTillDate || scheduleModel.loanTermVariations() == null ? 0L
-                : scheduleModel.loanTermVariations().getDueDateVariation().stream()
-                        .filter(x -> !repaymentPeriod.getFromDate().isAfter(x.getTermVariationApplicableFrom())
-                                && !repaymentPeriod.getDueDate().isBefore(x.getTermVariationApplicableFrom())
-                                && !repaymentPeriod.getDueDate().isAfter(x.getDateValue()))
-                        .map(x -> DateUtils.getDifferenceInDays(x.getTermVariationApplicableFrom(), x.getDateValue()))
-                        .reduce(0L, Long::sum);
+        final BigDecimal daysInMonth = daysInMonthType.isDaysInMonth_30() ? BigDecimal.valueOf(30) : calculatedDaysInPeriod;
 
         // TODO check: loanApplicationTerms.calculatePeriodsBetweenDates(startDate, endDate); // calculate period data
         // TODO review: (repayment frequency: days, weeks, years; validation day is month fix 30)
         // TODO refactor this logic to represent in interest period
         if (partialPeriodCalculationNeeded) {
-            final BigDecimal cumulatedPeriodFractions = calculatePeriodFractions(interestPeriodFromDate, interestPeriodDueDate, mc);
-            return rateFactorByRepaymentPartialPeriod(interestRate, repaymentEvery, cumulatedPeriodFractions, BigDecimal.ONE,
+            final BigDecimal cumulatedPeriodFractions = calculatePeriodFractions(scheduleModel, interestPeriodFromDate,
+                    interestPeriodDueDate, mc);
+            return rateFactorByRepaymentPartialPeriod(interestRate, BigDecimal.ONE, cumulatedPeriodFractions, BigDecimal.ONE,
                     BigDecimal.ONE, mc);
         }
 
-        return calculateRateFactorPerPeriodBasedOnRepaymentFrequency(interestRate, repaymentFrequency, repaymentEvery, daysInMonth,
-                daysInYear, actualDaysInPeriod, calculatedDaysInPeriod.subtract(BigDecimal.valueOf(addedDays), mc), mc);
+        return switch (daysInMonthType) {
+            case ACTUAL -> rateFactorByRepaymentPeriod(interestRate, actualDaysInPeriod, BigDecimal.ONE, daysInYear, BigDecimal.ONE,
+                    BigDecimal.ONE, mc);
+            case DAYS_30 -> calculateRateFactorPerPeriodBasedOnRepaymentFrequency(interestRate, repaymentFrequency, repaymentEvery,
+                    daysInMonth, daysInYear, actualDaysInPeriod, calculatedDaysInPeriod, mc);
+            default -> throw new UnsupportedOperationException("Unsupported combination: Days in month: " + daysInMonthType);
+        };
     }
 
     /**
      * Calculate Period fractions part based on how much year has in the period
      *
+     * @param scheduleModel
      * @param interestPeriodFromDate
      * @param interestPeriodDueDate
      * @return
      */
-    private BigDecimal calculatePeriodFractions(final LocalDate interestPeriodFromDate, final LocalDate interestPeriodDueDate,
-            MathContext mc) {
+    public BigDecimal calculatePeriodFractions(ProgressiveLoanInterestScheduleModel scheduleModel, final LocalDate interestPeriodFromDate,
+            final LocalDate interestPeriodDueDate, MathContext mc) {
         BigDecimal cumulatedRateFactor = BigDecimal.ZERO;
         int actualYear = interestPeriodFromDate.getYear();
         int endYear = interestPeriodDueDate.getYear();
         LocalDate actualDate = interestPeriodFromDate;
-        LocalDate endOfActualYear;
+        LocalDate fractionPeriodDueDate;
 
         while (actualYear <= endYear) {
-            endOfActualYear = actualYear == endYear ? interestPeriodDueDate : LocalDate.of(actualYear, 12, 31);
+            fractionPeriodDueDate = actualYear == endYear ? interestPeriodDueDate
+                    : getFractionPeriodDueDateForEndOfYear(scheduleModel, actualYear);
             BigDecimal numberOfDaysInYear = BigDecimal.valueOf(Year.of(actualYear).length());
-            BigDecimal calculatedDaysInActualYear = BigDecimal.valueOf(DateUtils.getDifferenceInDays(actualDate, endOfActualYear));
+            BigDecimal calculatedDaysInActualYear = BigDecimal.valueOf(DateUtils.getDifferenceInDays(actualDate, fractionPeriodDueDate));
             cumulatedRateFactor = cumulatedRateFactor.add(calculatedDaysInActualYear.divide(numberOfDaysInYear, mc), mc);
-            actualDate = endOfActualYear;
+            actualDate = fractionPeriodDueDate;
             actualYear++;
         }
         return cumulatedRateFactor;
+    }
+
+    /**
+     * Determines the last date of the year for interest calculation depending on the
+     * isInterestRecognitionOnDisbursementDate flag.
+     *
+     * @param scheduleModel
+     * @param year
+     * @return
+     */
+    private LocalDate getFractionPeriodDueDateForEndOfYear(ProgressiveLoanInterestScheduleModel scheduleModel, int year) {
+        if (scheduleModel.loanProductRelatedDetail().isInterestRecognitionOnDisbursementDate()) {
+            return LocalDate.of(year + 1, 1, 1);
+        } else {
+            return LocalDate.of(year, 12, 31);
+        }
     }
 
     /**
@@ -547,18 +733,18 @@ public final class ProgressiveEMICalculator implements EMICalculator {
         });
     }
 
-    private void calculateEMIOnNewEmptyModelAndMerge(List<RepaymentPeriod> repaymentPeriods,
-            ProgressiveLoanInterestScheduleModel scheduleModel, final EmiChangeOperation operation) {
+    private void calculateEMIOnNewModelAndMerge(List<RepaymentPeriod> repaymentPeriods, ProgressiveLoanInterestScheduleModel scheduleModel,
+            final EmiChangeOperation operation) {
         if (repaymentPeriods.isEmpty()) {
             return;
         }
-        final ProgressiveLoanInterestScheduleModel scheduleModelCopy = scheduleModel.emptyCopy();
-        addDisbursement(scheduleModelCopy, operation);
+        final ProgressiveLoanInterestScheduleModel scheduleModelCopy = scheduleModel.copyWithoutPaidAmounts();
+        addDisbursement(scheduleModelCopy, operation.withZeroAmount());
 
         final LocalDate firstDueDate = repaymentPeriods.get(0).getDueDate();
         scheduleModel.copyPeriodsFrom(firstDueDate, scheduleModelCopy.repaymentPeriods(), (newRepaymentPeriod, actualRepaymentPeriod) -> {
-            actualRepaymentPeriod.setEmi(actualRepaymentPeriod.getEmi().plus(newRepaymentPeriod.getEmi()));
-            actualRepaymentPeriod.setOriginalEmi(actualRepaymentPeriod.getOriginalEmi().plus(newRepaymentPeriod.getOriginalEmi()));
+            actualRepaymentPeriod.setEmi(newRepaymentPeriod.getEmi());
+            actualRepaymentPeriod.setOriginalEmi(newRepaymentPeriod.getOriginalEmi());
         });
     }
 

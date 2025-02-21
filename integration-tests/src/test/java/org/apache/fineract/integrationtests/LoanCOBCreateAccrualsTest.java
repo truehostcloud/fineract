@@ -20,14 +20,20 @@ package org.apache.fineract.integrationtests;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.atomic.AtomicReference;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.fineract.client.models.CreditAllocationData;
+import org.apache.fineract.client.models.CreditAllocationOrder;
 import org.apache.fineract.client.models.GetLoansLoanIdResponse;
 import org.apache.fineract.client.models.PostClientsResponse;
 import org.apache.fineract.client.models.PostLoanProductsResponse;
 import org.apache.fineract.client.models.PostLoansLoanIdTransactionsRequest;
 import org.apache.fineract.integrationtests.common.ClientHelper;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.jupiter.api.Assertions;
 
@@ -467,19 +473,238 @@ public class LoanCOBCreateAccrualsTest extends BaseLoanIntegrationTest {
                     || "loanTransactionType.accrualAdjustment".equals(t.getType().getCode())));
 
             // Accruals around installment due dates are as expected
-            Assertions.assertTrue(loanDetails.getTransactions().stream().anyMatch(
-                    t -> t.getDate().equals(LocalDate.of(2025, 1, 20)) && t.getType().getAccrual() && t.getAmount().equals(0.16D)));
-            Assertions.assertTrue(loanDetails.getTransactions().stream().anyMatch(
-                    t -> t.getDate().equals(LocalDate.of(2025, 1, 21)) && t.getType().getAccrual() && t.getAmount().equals(0.16D)));
-            Assertions.assertTrue(loanDetails.getTransactions().stream().anyMatch(
-                    t -> t.getDate().equals(LocalDate.of(2025, 2, 20)) && t.getType().getAccrual() && t.getAmount().equals(0.16D)));
-            Assertions.assertTrue(loanDetails.getTransactions().stream().anyMatch(
-                    t -> t.getDate().equals(LocalDate.of(2025, 2, 21)) && t.getType().getAccrual() && t.getAmount().equals(0.18D)));
-            Assertions.assertTrue(loanDetails.getTransactions().stream().anyMatch(
-                    t -> t.getDate().equals(LocalDate.of(2025, 3, 20)) && t.getType().getAccrual() && t.getAmount().equals(0.18D)));
-            Assertions.assertTrue(loanDetails.getTransactions().stream().anyMatch(
-                    t -> t.getDate().equals(LocalDate.of(2025, 3, 21)) && t.getType().getAccrual() && t.getAmount().equals(0.16D)));
+            validateTransactionsExist(loanDetails, //
+                    transaction(0.16, "Accrual", "20 January 2025", 0.0, 0.0, 0.16, 0.0, 0.0, 0.0, 0.0), //
+                    transaction(0.16, "Accrual", "21 January 2025", 0.0, 0.0, 0.16, 0.0, 0.0, 0.0, 0.0), //
+                    transaction(0.16, "Accrual", "20 February 2025", 0.0, 0.0, 0.16, 0.0, 0.0, 0.0, 0.0), //
+                    transaction(0.18, "Accrual", "21 February 2025", 0.0, 0.0, 0.18, 0.0, 0.0, 0.0, 0.0), //
+                    transaction(0.18, "Accrual", "20 March 2025", 0.0, 0.0, 0.18, 0.0, 0.0, 0.0, 0.0), //
+                    transaction(0.16, "Accrual", "21 March 2025", 0.0, 0.0, 0.16, 0.0, 0.0, 0.0, 0.0) //
+            );
         });
 
+    }
+
+    @Test
+    public void testInterestRecognitionOnDisbursementDateTrue() {
+        AtomicReference<Long> loanIdRef = new AtomicReference<>();
+        setup();
+        final PostLoanProductsResponse loanProductsResponse = loanProductHelper
+                .createLoanProduct(create4IProgressive().interestRecognitionOnDisbursementDate(true));
+
+        runAt("20 December 2024", () -> {
+            Long loanId = applyAndApproveProgressiveLoan(client.getClientId(), loanProductsResponse.getResourceId(), "20 December 2024",
+                    430.0, 26.0, 6, null);
+
+            loanIdRef.set(loanId);
+
+            disburseLoan(loanId, BigDecimal.valueOf(430), "20 December 2024");
+
+            GetLoansLoanIdResponse loanDetails = loanTransactionHelper.getLoanDetails(loanId);
+            validateFullyUnpaidRepaymentPeriod(loanDetails, 1, "20 January 2025", 67.88, 0, 0, 9.32);
+            validateFullyUnpaidRepaymentPeriod(loanDetails, 2, "20 February 2025", 69.35, 0, 0, 7.85);
+            validateFullyUnpaidRepaymentPeriod(loanDetails, 3, "20 March 2025", 70.86, 0, 0, 6.34);
+            validateFullyUnpaidRepaymentPeriod(loanDetails, 4, "20 April 2025", 72.39, 0, 0, 4.81);
+            validateFullyUnpaidRepaymentPeriod(loanDetails, 5, "20 May 2025", 73.96, 0, 0, 3.24);
+            validateFullyUnpaidRepaymentPeriod(loanDetails, 6, "20 June 2025", 75.56, 0, 0, 1.64);
+
+            verifyTransactions(loanId, transaction(430.0d, "Disbursement", "20 December 2024"));
+            executeInlineCOB(loanId);
+        });
+        // disbursement date is included
+        runAt("21 December 2024", () -> {
+            Long loanId = loanIdRef.get();
+            executeInlineCOB(loanId);
+
+            verifyTransactions(loanId, //
+                    transaction(430.0d, "Disbursement", "20 December 2024", 430.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, false), //
+                    transaction(0.30d, "Accrual", "20 December 2024", 0.0, 0.0, 0.3, 0.0, 0.0, 0.0, 0.0, false));
+        });
+        // last installment due date is excluded
+        runAt("21 June 2025", () -> {
+            Long loanId = loanIdRef.get();
+            executeInlineCOB(loanId);
+            GetLoansLoanIdResponse loanDetails = loanTransactionHelper.getLoanDetails(loanId);
+
+            Assertions.assertTrue(loanDetails.getTransactions().stream()
+                    .noneMatch(t -> t.getDate().equals(LocalDate.of(2025, 6, 20)) && t.getType().getAccrual()));
+        });
+    }
+
+    @Test
+    public void testInterestRecognitionOnDisbursementDateFalse() {
+        AtomicReference<Long> loanIdRef = new AtomicReference<>();
+        setup();
+        final PostLoanProductsResponse loanProductsResponse = loanProductHelper
+                .createLoanProduct(create4IProgressive().interestRecognitionOnDisbursementDate(false));
+
+        runAt("20 December 2024", () -> {
+            Long loanId = applyAndApproveProgressiveLoan(client.getClientId(), loanProductsResponse.getResourceId(), "20 December 2024",
+                    430.0, 26.0, 6, null);
+
+            loanIdRef.set(loanId);
+
+            disburseLoan(loanId, BigDecimal.valueOf(430), "20 December 2024");
+
+            GetLoansLoanIdResponse loanDetails = loanTransactionHelper.getLoanDetails(loanId);
+            validateFullyUnpaidRepaymentPeriod(loanDetails, 1, "20 January 2025", 67.88, 0, 0, 9.32);
+            validateFullyUnpaidRepaymentPeriod(loanDetails, 2, "20 February 2025", 69.35, 0, 0, 7.85);
+            validateFullyUnpaidRepaymentPeriod(loanDetails, 3, "20 March 2025", 70.86, 0, 0, 6.34);
+            validateFullyUnpaidRepaymentPeriod(loanDetails, 4, "20 April 2025", 72.39, 0, 0, 4.81);
+            validateFullyUnpaidRepaymentPeriod(loanDetails, 5, "20 May 2025", 73.96, 0, 0, 3.24);
+            validateFullyUnpaidRepaymentPeriod(loanDetails, 6, "20 June 2025", 75.56, 0, 0, 1.64);
+
+            verifyTransactions(loanId, transaction(430.0d, "Disbursement", "20 December 2024"));
+            executeInlineCOB(loanId);
+        });
+        runAt("21 December 2024", () -> {
+            Long loanId = loanIdRef.get();
+            executeInlineCOB(loanId);
+
+            verifyTransactions(loanId, //
+                    transaction(430.0d, "Disbursement", "20 December 2024", 430.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, false));
+        });
+    }
+
+    @Test
+    public void testProgressiveChargeBackNoInterestRecalculation() {
+        AtomicReference<Long> loanIdRef = new AtomicReference<>();
+        AtomicReference<Long> repaymentIdRef = new AtomicReference<>();
+
+        setup();
+        final PostLoanProductsResponse loanProductsResponse = loanProductHelper
+                .createLoanProduct(create4IProgressive().isInterestRecalculationEnabled(false)
+                        .creditAllocation(chargebackCreditAllocationOrders(List.of("PRINCIPAL", "PENALTY", "FEE", "INTEREST")))
+                        .currencyCode("USD"));
+
+        runAt("20 December 2024", () -> {
+            Long loanId = applyAndApproveProgressiveLoan(client.getClientId(), loanProductsResponse.getResourceId(), "20 December 2024",
+                    430.0, 26.0, 6, null);
+
+            loanIdRef.set(loanId);
+
+            disburseLoan(loanId, BigDecimal.valueOf(430), "20 December 2024");
+            executeInlineCOB(loanId);
+        });
+        runAt("20 January 2025", () -> {
+            Long loanId = loanIdRef.get();
+            executeInlineCOB(loanId);
+
+            addCharge(loanId, true, 5.0d, "20 January 2025");
+            Long repaymentId = loanTransactionHelper.makeLoanRepayment(loanId, "Repayment", "20 January 2025", 82.20).getResourceId();
+            repaymentIdRef.set(repaymentId);
+        });
+        runAt("2 February 2025", () -> {
+            Long loanId = loanIdRef.get();
+            executeInlineCOB(loanId);
+
+            addChargebackForLoan(loanId, repaymentIdRef.get(), 82.20);
+        });
+        runAt("20 February 2025", () -> {
+            Long loanId = loanIdRef.get();
+            executeInlineCOB(loanId);
+
+            GetLoansLoanIdResponse loanDetails = loanTransactionHelper.getLoanDetails(loanId);
+            validateTransactionsExist(loanDetails, //
+                    transaction(0.26, "Accrual", "01 February 2025", 0.0, 0.0, 0.26, 0.0, 0.0, 0.0, 0.0), //
+                    transaction(0.25, "Accrual", "02 February 2025", 0.0, 0.0, 0.25, 0.0, 0.0, 0.0, 0.0), //
+                    transaction(0.25, "Accrual", "03 February 2025", 0.0, 0.0, 0.25, 0.0, 0.0, 0.0, 0.0)); //
+        });
+        runAt("23 February 2025", () -> {
+            Long loanId = loanIdRef.get();
+            executeInlineCOB(loanId);
+
+            GetLoansLoanIdResponse loanDetails = loanTransactionHelper.getLoanDetails(loanId);
+            validateTransactionsExist(loanDetails, //
+                    transaction(0.25, "Accrual", "19 February 2025", 0.0, 0.0, 0.25, 0.0, 0.0, 0.0, 0.0), //
+                    transaction(0.26, "Accrual", "20 February 2025", 0.0, 0.0, 0.26, 0.0, 0.0, 0.0, 0.0), //
+                    transaction(0.23, "Accrual", "21 February 2025", 0.0, 0.0, 0.23, 0.0, 0.0, 0.0, 0.0), //
+                    transaction(0.22, "Accrual", "22 February 2025", 0.0, 0.0, 0.22, 0.0, 0.0, 0.0, 0.0)); //
+        });
+    }
+
+    @Ignore // TODO: enable when implementation is complete
+    @Test
+    public void testProgressiveChargeBackInterestRecalculation() {
+        AtomicReference<Long> loanIdRef = new AtomicReference<>();
+        AtomicReference<Long> repaymentIdRef = new AtomicReference<>();
+
+        setup();
+        final PostLoanProductsResponse loanProductsResponse = loanProductHelper
+                .createLoanProduct(create4IProgressive().isInterestRecalculationEnabled(true)
+                        .creditAllocation(chargebackCreditAllocationOrders(List.of("PRINCIPAL", "PENALTY", "FEE", "INTEREST")))
+                        .currencyCode("USD"));
+
+        runAt("20 December 2024", () -> {
+            Long loanId = applyAndApproveProgressiveLoan(client.getClientId(), loanProductsResponse.getResourceId(), "20 December 2024",
+                    430.0, 26.0, 6, null);
+
+            loanIdRef.set(loanId);
+
+            disburseLoan(loanId, BigDecimal.valueOf(430), "20 December 2024");
+            executeInlineCOB(loanId);
+        });
+        runAt("20 January 2025", () -> {
+            Long loanId = loanIdRef.get();
+            executeInlineCOB(loanId);
+
+            addCharge(loanId, true, 5.0d, "20 January 2025");
+            Long repaymentId = loanTransactionHelper.makeLoanRepayment(loanId, "Repayment", "20 January 2025", 82.20).getResourceId();
+            repaymentIdRef.set(repaymentId);
+        });
+        runAt("2 February 2025", () -> {
+            Long loanId = loanIdRef.get();
+            executeInlineCOB(loanId);
+
+            addChargebackForLoan(loanId, repaymentIdRef.get(), 82.20);
+        });
+        runAt("20 February 2025", () -> {
+            Long loanId = loanIdRef.get();
+            executeInlineCOB(loanId);
+
+            GetLoansLoanIdResponse loanDetails = loanTransactionHelper.getLoanDetails(loanId);
+            validateTransactionsExist(loanDetails, //
+                    transaction(0.26, "Accrual", "01 February 2025", 0.0, 0.0, 0.26, 0.0, 0.0, 0.0, 0.0), //
+                    transaction(0.25, "Accrual", "02 February 2025", 0.0, 0.0, 0.25, 0.0, 0.0, 0.0, 0.0), //
+                    transaction(0.30, "Accrual", "03 February 2025", 0.0, 0.0, 0.30, 0.0, 0.0, 0.0, 0.0), //
+                    transaction(0.30, "Accrual", "04 February 2025", 0.0, 0.0, 0.30, 0.0, 0.0, 0.0, 0.0)); //
+        });
+        runAt("23 February 2025", () -> {
+            Long loanId = loanIdRef.get();
+            executeInlineCOB(loanId);
+
+            GetLoansLoanIdResponse loanDetails = loanTransactionHelper.getLoanDetails(loanId);
+            validateTransactionsExist(loanDetails, //
+                    transaction(0.30, "Accrual", "19 February 2025", 0.0, 0.0, 0.30, 0.0, 0.0, 0.0, 0.0), //
+                    transaction(0.30, "Accrual", "20 February 2025", 0.0, 0.0, 0.30, 0.0, 0.0, 0.0, 0.0), //
+                    transaction(0.23, "Accrual", "21 February 2025", 0.0, 0.0, 0.23, 0.0, 0.0, 0.0, 0.0), //
+                    transaction(0.22, "Accrual", "22 February 2025", 0.0, 0.0, 0.22, 0.0, 0.0, 0.0, 0.0)); //
+        });
+    }
+
+    private List<CreditAllocationData> chargebackCreditAllocationOrders(List<String> allocationIds) {
+        List<CreditAllocationOrder> creditAllocationOrders = new ArrayList<>(allocationIds.size());
+        for (int i = 0; i < allocationIds.size(); i++) {
+            String allocationId = allocationIds.get(i);
+            creditAllocationOrders.add(new CreditAllocationOrder().order(i + 1).creditAllocationRule(allocationId));
+        }
+        return List.of(new CreditAllocationData().transactionType("CHARGEBACK").creditAllocationOrder(creditAllocationOrders));
+    }
+
+    private void validateTransactionsExist(GetLoansLoanIdResponse loanDetails, TransactionExt... transactions) {
+        Arrays.stream(transactions).forEach(tr -> {
+            boolean found = loanDetails.getTransactions().stream().anyMatch(item -> Objects.equals(item.getAmount(), tr.amount) //
+                    && Objects.equals(item.getType().getValue(), tr.type) //
+                    && Objects.equals(item.getDate(), LocalDate.parse(tr.date, dateTimeFormatter)) //
+                    && Objects.equals(item.getOutstandingLoanBalance(), tr.outstandingPrincipal) //
+                    && Objects.equals(item.getPrincipalPortion(), tr.principalPortion) //
+                    && Objects.equals(item.getInterestPortion(), tr.interestPortion) //
+                    && Objects.equals(item.getFeeChargesPortion(), tr.feePortion) //
+                    && Objects.equals(item.getPenaltyChargesPortion(), tr.penaltyPortion) //
+                    && Objects.equals(item.getOverpaymentPortion(), tr.overpaymentPortion) //
+                    && Objects.equals(item.getUnrecognizedIncomePortion(), tr.unrecognizedPortion) //
+            );
+            Assertions.assertTrue(found, "Required transaction not found: " + tr + " on loan " + loanDetails.getId());
+        });
     }
 }

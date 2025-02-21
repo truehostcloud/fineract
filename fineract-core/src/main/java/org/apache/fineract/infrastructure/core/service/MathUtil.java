@@ -217,6 +217,10 @@ public final class MathUtil {
         return nullToZero(first).compareTo(nullToZero(second)) < 0;
     }
 
+    public static boolean isLessThanOrEqualTo(BigDecimal first, BigDecimal second) {
+        return nullToZero(first).compareTo(second) <= 0;
+    }
+
     public static boolean isGreaterThanOrEqualTo(BigDecimal first, BigDecimal second) {
         return nullToZero(first).compareTo(nullToZero(second)) >= 0;
     }
@@ -265,9 +269,13 @@ public final class MathUtil {
 
     /** @return sum the values considering null values */
     public static BigDecimal add(BigDecimal... amounts) {
+        return add(MoneyHelper.getMathContext(), amounts);
+    }
+
+    public static BigDecimal add(MathContext mc, BigDecimal... amounts) {
         BigDecimal result = null;
         for (BigDecimal amount : amounts) {
-            result = add(result, amount, MoneyHelper.getMathContext());
+            result = add(result, amount, mc);
         }
         return result;
     }

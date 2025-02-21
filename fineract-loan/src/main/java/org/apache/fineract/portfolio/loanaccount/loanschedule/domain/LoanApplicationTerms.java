@@ -229,6 +229,7 @@ public final class LoanApplicationTerms {
     private boolean enableAccrualActivityPosting;
     private List<LoanSupportedInterestRefundTypes> supportedInterestRefundTypes;
     private LoanChargeOffBehaviour chargeOffBehaviour;
+    private boolean interestRecognitionOnDisbursementDate;
 
     private LoanApplicationTerms(Builder builder) {
         this.currency = builder.currency;
@@ -253,6 +254,8 @@ public final class LoanApplicationTerms {
         this.seedDate = builder.seedDate;
         this.isDownPaymentEnabled = builder.isDownPaymentEnabled;
         this.disbursedAmountPercentageForDownPayment = builder.downPaymentPercentage;
+        this.interestRecognitionOnDisbursementDate = builder.interestRecognitionOnDisbursementDate != null
+                && builder.interestRecognitionOnDisbursementDate;
         if (isDownPaymentEnabled) {
             this.downPaymentAmount = Money.of(getCurrency(),
                     MathUtil.percentageOf(getPrincipal().getAmount(), getDisbursedAmountPercentageForDownPayment(), builder.mc),
@@ -290,6 +293,7 @@ public final class LoanApplicationTerms {
         private LocalDate submittedOnDate;
         private LocalDate seedDate;
         private MathContext mc;
+        private Boolean interestRecognitionOnDisbursementDate;
 
         public Builder currency(CurrencyData currency) {
             this.currency = currency;
@@ -401,6 +405,11 @@ public final class LoanApplicationTerms {
             return this;
         }
 
+        public Builder interestRecognitionOnDisbursementDate(boolean value) {
+            this.interestRecognitionOnDisbursementDate = value;
+            return this;
+        }
+
         public LoanApplicationTerms build() {
             return new LoanApplicationTerms(this);
         }
@@ -429,7 +438,8 @@ public final class LoanApplicationTerms {
                 .daysInMonthType(modelData.daysInMonth()).daysInYearType(modelData.daysInYear()).fixedLength(modelData.fixedLength())
                 .inArrearsTolerance(Money.zero(modelData.currency(), mc)).disbursementDatas(new ArrayList<>())
                 .isDownPaymentEnabled(modelData.downPaymentEnabled()).downPaymentPercentage(downPaymentPercentage)
-                .submittedOnDate(modelData.scheduleGenerationStartDate()).seedDate(seedDate).mc(mc).build();
+                .submittedOnDate(modelData.scheduleGenerationStartDate()).seedDate(seedDate)
+                .interestRecognitionOnDisbursementDate(modelData.interestRecognitionOnDisbursementDate()).mc(mc).build();
     }
 
     public static LoanApplicationTerms assembleFrom(final CurrencyData currency, final Integer loanTermFrequency,
@@ -460,7 +470,7 @@ public final class LoanApplicationTerms {
             final LocalDate submittedOnDate, final LoanScheduleType loanScheduleType,
             final LoanScheduleProcessingType loanScheduleProcessingType, final Integer fixedLength,
             final boolean enableAccrualActivityPosting, final List<LoanSupportedInterestRefundTypes> supportedInterestRefundTypes,
-            final LoanChargeOffBehaviour chargeOffBehaviour) {
+            final LoanChargeOffBehaviour chargeOffBehaviour, final boolean interestRecognitionOnDisbursementDate) {
 
         final LoanRescheduleStrategyMethod rescheduleStrategyMethod = null;
         final CalendarHistoryDataWrapper calendarHistoryDataWrapper = null;
@@ -479,7 +489,8 @@ public final class LoanApplicationTerms {
                 isInterestToBeRecoveredFirstWhenGreaterThanEMI, fixedPrincipalPercentagePerInstallment,
                 isPrincipalCompoundingDisabledForOverdueLoans, enableDownPayment, disbursedAmountPercentageForDownPayment,
                 isAutoRepaymentForDownPaymentEnabled, repaymentStartDateType, submittedOnDate, loanScheduleType, loanScheduleProcessingType,
-                fixedLength, enableAccrualActivityPosting, supportedInterestRefundTypes, chargeOffBehaviour);
+                fixedLength, enableAccrualActivityPosting, supportedInterestRefundTypes, chargeOffBehaviour,
+                interestRecognitionOnDisbursementDate);
 
     }
 
@@ -552,7 +563,8 @@ public final class LoanApplicationTerms {
                 fixedPrincipalPercentagePerInstallment, isPrincipalCompoundingDisabledForOverdueLoans, isDownPaymentEnabled,
                 disbursedAmountPercentageForDownPayment, isAutoRepaymentForDownPaymentEnabled, repaymentStartDateType, submittedOnDate,
                 loanScheduleType, loanScheduleProcessingType, fixedLength, loanProductRelatedDetail.isEnableAccrualActivityPosting(),
-                loanProductRelatedDetail.getSupportedInterestRefundTypes(), loanProductRelatedDetail.getChargeOffBehaviour());
+                loanProductRelatedDetail.getSupportedInterestRefundTypes(), loanProductRelatedDetail.getChargeOffBehaviour(),
+                loanProductRelatedDetail.isInterestRecognitionOnDisbursementDate());
     }
 
     private LoanApplicationTerms(final CurrencyData currency, final Integer loanTermFrequency,
@@ -582,7 +594,8 @@ public final class LoanApplicationTerms {
             final BigDecimal disbursedAmountPercentageForDownPayment, final boolean isAutoRepaymentForDownPaymentEnabled,
             final RepaymentStartDateType repaymentStartDateType, final LocalDate submittedOnDate, final LoanScheduleType loanScheduleType,
             final LoanScheduleProcessingType loanScheduleProcessingType, final Integer fixedLength, boolean enableAccrualActivityPosting,
-            final List<LoanSupportedInterestRefundTypes> supportedInterestRefundTypes, final LoanChargeOffBehaviour chargeOffBehaviour) {
+            final List<LoanSupportedInterestRefundTypes> supportedInterestRefundTypes, final LoanChargeOffBehaviour chargeOffBehaviour,
+            final boolean interestRecognitionOnDisbursementDate) {
 
         this.currency = currency;
         this.loanTermFrequency = loanTermFrequency;
@@ -682,6 +695,7 @@ public final class LoanApplicationTerms {
         this.fixedLength = fixedLength;
         this.supportedInterestRefundTypes = supportedInterestRefundTypes;
         this.chargeOffBehaviour = chargeOffBehaviour;
+        this.interestRecognitionOnDisbursementDate = interestRecognitionOnDisbursementDate;
     }
 
     public Money adjustPrincipalIfLastRepaymentPeriod(final Money principalForPeriod, final Money totalCumulativePrincipalToDate,
@@ -1543,16 +1557,17 @@ public final class LoanApplicationTerms {
                 this.interestRecalculationEnabled, this.isEqualAmortization, this.isDownPaymentEnabled,
                 this.disbursedAmountPercentageForDownPayment, this.isAutoRepaymentForDownPaymentEnabled, this.loanScheduleType,
                 this.loanScheduleProcessingType, this.fixedLength, this.enableAccrualActivityPosting, this.supportedInterestRefundTypes,
-                this.chargeOffBehaviour);
+                this.chargeOffBehaviour, this.interestRecognitionOnDisbursementDate);
     }
 
     public LoanProductMinimumRepaymentScheduleRelatedDetail toLoanProductRelatedDetailMinimumData() {
         final CurrencyData currency = new CurrencyData(this.currency.getCode(), this.currency.getDecimalPlaces(),
                 this.currency.getInMultiplesOf());
-        return new LoanProductRelatedDetailMinimumData(currency, principal, inArrearsTolerance, interestRatePerPeriod,
-                annualNominalInterestRate, interestChargingGrace, interestPaymentGrace, principalGrace,
-                recurringMoratoriumOnPrincipalPeriods, interestMethod, interestCalculationPeriodMethod, daysInYearType, daysInMonthType,
-                amortizationMethod, repaymentPeriodFrequencyType, repaymentEvery, numberOfRepayments);
+        return new LoanProductRelatedDetailMinimumData(currency, interestRatePerPeriod, annualNominalInterestRate, interestChargingGrace,
+                interestPaymentGrace, principalGrace, recurringMoratoriumOnPrincipalPeriods, interestMethod,
+                interestCalculationPeriodMethod, daysInYearType, daysInMonthType, amortizationMethod, repaymentPeriodFrequencyType,
+                repaymentEvery, numberOfRepayments,
+                isInterestChargedFromDateSameAsDisbursalDateEnabled != null && isInterestChargedFromDateSameAsDisbursalDateEnabled);
     }
 
     public Integer getLoanTermFrequency() {
@@ -1670,6 +1685,14 @@ public final class LoanApplicationTerms {
 
     public LoanRescheduleStrategyMethod getLoanRescheduleStrategyMethod() {
         return LoanRescheduleStrategyMethod.REDUCE_EMI_AMOUNT;
+    }
+
+    public boolean isInterestBearing() {
+        return BigDecimal.ZERO.compareTo(getAnnualNominalInterestRate()) < 0;
+    }
+
+    public boolean isInterestBearingAndInterestRecalculationEnabled() {
+        return isInterestBearing() && isInterestRecalculationEnabled();
     }
 
     public boolean isInterestRecalculationEnabled() {

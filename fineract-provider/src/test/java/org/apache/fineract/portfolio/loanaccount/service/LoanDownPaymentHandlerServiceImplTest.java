@@ -101,12 +101,16 @@ public class LoanDownPaymentHandlerServiceImplTest {
     @Mock
     private LoanRefundValidator loanRefundValidator;
 
+    @Mock
+    private ReprocessLoanTransactionsService reprocessLoanTransactionsService;
+
     private LoanDownPaymentHandlerServiceImpl underTest;
 
     @BeforeEach
     public void setUp() {
         underTest = new LoanDownPaymentHandlerServiceImpl(loanTransactionRepository, businessEventNotifierService,
-                loanDownPaymentTransactionValidator, loanScheduleService, loanRefundService, loanRefundValidator);
+                loanDownPaymentTransactionValidator, loanScheduleService, loanRefundService, loanRefundValidator,
+                reprocessLoanTransactionsService);
         moneyHelper.when(MoneyHelper::getMathContext).thenReturn(new MathContext(12, RoundingMode.UP));
         moneyHelper.when(MoneyHelper::getRoundingMode).thenReturn(RoundingMode.UP);
         tempConfigServiceMock.when(TemporaryConfigurationServiceContainer::isExternalIdAutoGenerationEnabled).thenReturn(true);
@@ -145,6 +149,7 @@ public class LoanDownPaymentHandlerServiceImplTest {
         when(loanForProcessing.getLoanRepaymentScheduleDetail()).thenReturn(loanRepaymentRelatedDetail);
         when(loanForProcessing.repaymentScheduleDetail()).thenReturn(loanRepaymentRelatedDetail);
         when(loanRepaymentRelatedDetail.isInterestRecalculationEnabled()).thenReturn(true);
+        when(loanForProcessing.isInterestBearingAndInterestRecalculationEnabled()).thenReturn(true);
         when(loanRepaymentRelatedDetail.getDisbursedAmountPercentageForDownPayment()).thenReturn(BigDecimal.valueOf(10));
         when(loanForProcessing.getCurrency()).thenReturn(loanCurrency);
         when(loanForProcessing.loanCurrency()).thenReturn(loanCurrency);

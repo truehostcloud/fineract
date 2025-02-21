@@ -105,7 +105,7 @@ public class LoanChargeOffAccountingTest extends BaseLoanIntegrationTest {
 
     @Test
     public void loanChargeOffAccountingTreatmentTestForPeriodicAccrualAccounting() {
-        runAt("12 September 2022", () -> {
+        runAt("6 September 2022", () -> {
 
             // Loan ExternalId
             String loanExternalIdStr = UUID.randomUUID().toString();
@@ -161,6 +161,7 @@ public class LoanChargeOffAccountingTest extends BaseLoanIntegrationTest {
             this.journalEntryHelper.checkJournalEntryForIncomeAccount(incomeAccount, "6 September 2022",
                     new JournalEntry(20, JournalEntry.TransactionType.DEBIT));
 
+            updateBusinessDate("12 September 2022");
             // make Repayment
             final PostLoansLoanIdTransactionsResponse repaymentTransaction = loanTransactionHelper.makeLoanRepayment(loanExternalIdStr,
                     new PostLoansLoanIdTransactionsRequest().dateFormat("dd MMMM yyyy").transactionDate("7 September 2022").locale("en")
@@ -261,7 +262,7 @@ public class LoanChargeOffAccountingTest extends BaseLoanIntegrationTest {
 
     @Test
     public void loanChargeOffFraudAccountingTreatmentTestForCashBasedAccounting() {
-        runAt("12 September 2022", () -> {
+        runAt("6 September 2022", () -> {
 
             // Loan ExternalId
             String loanExternalIdStr = UUID.randomUUID().toString();
@@ -329,6 +330,8 @@ public class LoanChargeOffAccountingTest extends BaseLoanIntegrationTest {
                     new JournalEntry(1000, JournalEntry.TransactionType.DEBIT));
             this.journalEntryHelper.checkJournalEntryForIncomeAccount(incomeAccount, "6 September 2022",
                     new JournalEntry(20, JournalEntry.TransactionType.DEBIT));
+
+            updateBusinessDate("12 September 2022");
 
             // make Repayment
             final PostLoansLoanIdTransactionsResponse repaymentTransaction = loanTransactionHelper.makeLoanRepayment(loanExternalIdStr,
@@ -494,7 +497,7 @@ public class LoanChargeOffAccountingTest extends BaseLoanIntegrationTest {
 
     @Test
     public void loanAccountingTreatmentTestForGoodwillCreditPeriodicAccrualAccounting_ChargeOff() {
-        runAt("12 September 2022", () -> {
+        runAt("6 September 2022", () -> {
 
             // Loan ExternalId
             String loanExternalIdStr = UUID.randomUUID().toString();
@@ -549,6 +552,8 @@ public class LoanChargeOffAccountingTest extends BaseLoanIntegrationTest {
                     new JournalEntry(1000, JournalEntry.TransactionType.DEBIT));
             this.journalEntryHelper.checkJournalEntryForIncomeAccount(incomeAccount, "6 September 2022",
                     new JournalEntry(20, JournalEntry.TransactionType.DEBIT));
+
+            updateBusinessDate("12 September 2022");
 
             // Goodwill Credit
             final PostLoansLoanIdTransactionsResponse goodwillCredit_1 = loanTransactionHelper.makeGoodwillCredit((long) loanId,
@@ -633,7 +638,7 @@ public class LoanChargeOffAccountingTest extends BaseLoanIntegrationTest {
 
     @Test
     public void loanAccountingTreatmentTestForCashBasedAccounting_ChargeOff() {
-        runAt("12 September 2022", () -> {
+        runAt("6 September 2022", () -> {
 
             // Loan ExternalId
             String loanExternalIdStr = UUID.randomUUID().toString();
@@ -693,6 +698,8 @@ public class LoanChargeOffAccountingTest extends BaseLoanIntegrationTest {
                     new JournalEntry(1000, JournalEntry.TransactionType.DEBIT));
             this.journalEntryHelper.checkJournalEntryForIncomeAccount(incomeAccount, "6 September 2022",
                     new JournalEntry(20, JournalEntry.TransactionType.DEBIT));
+
+            updateBusinessDate("12 September 2022");
 
             // Goodwill Credit
             final PostLoansLoanIdTransactionsResponse goodwillCredit_1 = loanTransactionHelper.makeGoodwillCredit((long) loanId,

@@ -16,15 +16,17 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.fineract.portfolio.loanaccount.loanschedule.data;
+package org.apache.fineract.portfolio.loanaccount.data;
 
-import lombok.Data;
-import org.apache.fineract.organisation.monetary.domain.Money;
+import java.math.BigDecimal;
+import lombok.Getter;
+import lombok.Setter;
 
-@Data
-public class PeriodDueDetails {
+@Getter
+@Setter
+public class AccrualBalances {
 
-    private final Money emi;
-    private final Money duePrincipal;
-    private final Money dueInterest;
+    private BigDecimal interestPortion = BigDecimal.ZERO;
+    private BigDecimal feePortion = BigDecimal.ZERO;
+    private BigDecimal penaltyPortion = BigDecimal.ZERO;
 }

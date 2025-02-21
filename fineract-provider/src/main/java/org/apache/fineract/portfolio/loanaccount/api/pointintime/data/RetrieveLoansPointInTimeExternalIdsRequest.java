@@ -16,12 +16,17 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.fineract.portfolio.interestpauses.service;
+package org.apache.fineract.portfolio.loanaccount.api.pointintime.data;
 
-import org.apache.fineract.portfolio.loanaccount.domain.LoanTransaction;
+import java.util.List;
+import lombok.Data;
+import org.apache.fineract.infrastructure.core.api.DateParam;
 
-public interface AccountTransfersService {
+@Data
+public class RetrieveLoansPointInTimeExternalIdsRequest {
 
-    void updateLoanTransaction(Long loanTransactionId, LoanTransaction newLoanTransaction);
-
+    private List<String> externalIds;
+    private DateParam date;
+    private String dateFormat;
+    private String locale;
 }

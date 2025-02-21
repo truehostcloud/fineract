@@ -16,19 +16,12 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.fineract.portfolio.loanaccount.loanschedule.data;
+package org.apache.fineract.portfolio.interestpauses.service;
 
-import java.math.BigDecimal;
-import java.time.LocalDate;
-import org.jetbrains.annotations.NotNull;
+import org.apache.fineract.portfolio.loanaccount.domain.LoanTransaction;
 
-public record InterestRate(//
-        LocalDate effectiveFrom, //
-        BigDecimal interestRate//
-) implements Comparable<InterestRate> {
+public interface LoanAccountTransfersService {
 
-    @Override
-    public int compareTo(@NotNull InterestRate o) {
-        return this.effectiveFrom().compareTo(o.effectiveFrom());
-    }
+    void updateLoanTransaction(Long loanTransactionId, LoanTransaction newLoanTransaction);
+
 }

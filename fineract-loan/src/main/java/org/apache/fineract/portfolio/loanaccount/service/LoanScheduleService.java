@@ -24,7 +24,6 @@ import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import org.apache.fineract.infrastructure.core.service.DateUtils;
 import org.apache.fineract.portfolio.loanaccount.data.ScheduleGeneratorDTO;
-import org.apache.fineract.portfolio.loanaccount.domain.ChangedTransactionDetail;
 import org.apache.fineract.portfolio.loanaccount.domain.Loan;
 import org.apache.fineract.portfolio.loanaccount.domain.LoanCharge;
 import org.apache.fineract.portfolio.loanaccount.loanschedule.data.LoanScheduleDTO;
@@ -35,6 +34,7 @@ import org.apache.fineract.portfolio.loanaccount.loanschedule.domain.LoanSchedul
 public class LoanScheduleService {
 
     private final LoanChargeService loanChargeService;
+    private final ReprocessLoanTransactionsService reprocessLoanTransactionsService;
 
     /**
      * Ability to regenerate the repayment schedule based on the loans current details/state.
@@ -53,32 +53,28 @@ public class LoanScheduleService {
         }
     }
 
-    public void recalculateScheduleFromLastTransaction(final Loan loan, final ScheduleGeneratorDTO generatorDTO) {
-        if (loan.repaymentScheduleDetail().isInterestRecalculationEnabled() && !loan.isChargedOff()) {
+    public void recalculateSchedule(final Loan loan, final ScheduleGeneratorDTO generatorDTO) {
+        if (loan.isInterestBearingAndInterestRecalculationEnabled() && !loan.isChargedOff()) {
             regenerateRepaymentScheduleWithInterestRecalculation(loan, generatorDTO);
         } else {
             regenerateRepaymentSchedule(loan, generatorDTO);
         }
-        loan.reprocessTransactions();
+        reprocessLoanTransactionsService.reprocessTransactions(loan);
     }
 
-    public ChangedTransactionDetail recalculateScheduleFromLastTransaction(final Loan loan, final ScheduleGeneratorDTO generatorDTO,
+    public void recalculateScheduleFromLastTransaction(final Loan loan, final ScheduleGeneratorDTO generatorDTO,
             final List<Long> existingTransactionIds, final List<Long> existingReversedTransactionIds) {
         existingTransactionIds.addAll(loan.findExistingTransactionIds());
         existingReversedTransactionIds.addAll(loan.findExistingReversedTransactionIds());
-        /*
-         * LocalDate recalculateFrom = null; List<LoanTransaction> loanTransactions =
-         * this.retrieveListOfTransactionsPostDisbursementExcludeAccruals(); for (LoanTransaction loanTransaction :
-         * loanTransactions) { if (recalculateFrom == null ||
-         * loanTransaction.getTransactionDate().isAfter(recalculateFrom)) { recalculateFrom =
-         * loanTransaction.getTransactionDate(); } } generatorDTO.setRecalculateFrom(recalculateFrom);
-         */
-        if (loan.repaymentScheduleDetail().isInterestRecalculationEnabled() && !loan.isChargedOff()) {
-            regenerateRepaymentScheduleWithInterestRecalculation(loan, generatorDTO);
-        } else {
-            regenerateRepaymentSchedule(loan, generatorDTO);
+        if (!loan.isProgressiveSchedule()) {
+            if (loan.isInterestBearingAndInterestRecalculationEnabled() && !loan.isChargedOff()) {
+                regenerateRepaymentScheduleWithInterestRecalculation(loan, generatorDTO);
+            } else {
+                regenerateRepaymentSchedule(loan, generatorDTO);
+            }
         }
-        return loan.reprocessTransactions();
+
+        reprocessLoanTransactionsService.reprocessTransactions(loan);
     }
 
     public void regenerateRepaymentScheduleWithInterestRecalculation(final Loan loan, final ScheduleGeneratorDTO generatorDTO) {
@@ -111,13 +107,11 @@ public class LoanScheduleService {
                 }
             }
         }
-
         loan.processPostDisbursementTransactions();
     }
 
-    public ChangedTransactionDetail handleRegenerateRepaymentScheduleWithInterestRecalculation(final Loan loan,
-            final ScheduleGeneratorDTO generatorDTO) {
+    public void handleRegenerateRepaymentScheduleWithInterestRecalculation(final Loan loan, final ScheduleGeneratorDTO generatorDTO) {
         regenerateRepaymentScheduleWithInterestRecalculation(loan, generatorDTO);
-        return loan.reprocessTransactions();
+        reprocessLoanTransactionsService.reprocessTransactions(loan);
     }
 }

@@ -20,7 +20,6 @@ package org.apache.fineract.portfolio.loanaccount.service;
 
 import org.apache.fineract.infrastructure.core.api.JsonCommand;
 import org.apache.fineract.portfolio.loanaccount.data.ScheduleGeneratorDTO;
-import org.apache.fineract.portfolio.loanaccount.domain.ChangedTransactionDetail;
 import org.apache.fineract.portfolio.loanaccount.domain.Loan;
 import org.apache.fineract.portfolio.loanaccount.domain.LoanLifecycleStateMachine;
 import org.apache.fineract.portfolio.loanaccount.domain.LoanTransaction;
@@ -30,7 +29,7 @@ public interface LoanDownPaymentHandlerService {
     LoanTransaction handleDownPayment(ScheduleGeneratorDTO scheduleGeneratorDTO, JsonCommand command,
             LoanTransaction disbursementTransaction, Loan loan);
 
-    ChangedTransactionDetail handleRepaymentOrRecoveryOrWaiverTransaction(Loan loan, LoanTransaction newTransactionDetail,
+    void handleRepaymentOrRecoveryOrWaiverTransaction(Loan loan, LoanTransaction newTransactionDetail,
             LoanLifecycleStateMachine loanLifecycleStateMachine, LoanTransaction transactionForAdjustment,
             ScheduleGeneratorDTO scheduleGeneratorDTO);
 }

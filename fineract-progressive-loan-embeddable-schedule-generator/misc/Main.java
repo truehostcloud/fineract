@@ -55,8 +55,9 @@ public class Main {
         final DaysInYearType daysInYearType = DaysInYearType.DAYS_360;
         final Integer installmentAmountInMultiplesOf = null;
         final Integer fixedLength = null;
+        final Boolean interestRecognitionOnDisbursementDate = false;
 
-        var config = new LoanRepaymentScheduleModelData(startDate, currency, disbursedAmount, disbursementDate, noRepayments, repaymentFrequency, repaymentFrequencyType, annualNominalInterestRate, isDownPaymentEnabled, daysInMonthType, daysInYearType, downPaymentPercentage, installmentAmountInMultiplesOf, fixedLength);
+        var config = new LoanRepaymentScheduleModelData(startDate, currency, disbursedAmount, disbursementDate, noRepayments, repaymentFrequency, repaymentFrequencyType, annualNominalInterestRate, isDownPaymentEnabled, daysInMonthType, daysInYearType, downPaymentPercentage, installmentAmountInMultiplesOf, fixedLength, interestRecognitionOnDisbursementDate);
 
         final LoanSchedulePlan plan = calculator.generate(mc, config);
         printPlan(plan);
@@ -75,9 +76,9 @@ public class Main {
             if (period instanceof LoanSchedulePlanDisbursementPeriod dp) {
                 System.out.printf("  Disbursement - Date: %s, Amount: %s%n", dp.periodDueDate(), dp.getPrincipalAmount());
             } if (period instanceof LoanSchedulePlanDownPaymentPeriod rp) {
-                System.out.printf("  Down payment Period: #%d, Due Date: %s, Balance: %s, Principal: %s, Total: %s%n", rp.periodNumber(), rp.periodDueDate(), rp.getOutstandingLoanBalance(), rp.getPrincipalAmount(), rp.getTotalDueAmount());
+                System.out.printf("  Down payment Period: #%d, Due Date: %s, Balance: %s, Principal: %s, Total: %s, Total Outstanding Balance: %s%n", rp.periodNumber(), rp.periodDueDate(), rp.getOutstandingLoanBalance(), rp.getPrincipalAmount(), rp.getTotalDueAmount(), rp.getTotalOutstandingLoanBalance());
             } if (period instanceof LoanSchedulePlanRepaymentPeriod rp) {
-                System.out.printf("  Repayment Period: #%d, Due Date: %s, Balance: %s, Principal: %s, Interest: %s, Total: %s%n", rp.periodNumber(), rp.periodDueDate(), rp.getOutstandingLoanBalance(), rp.getPrincipalAmount(), rp.getInterestAmount(), rp.getTotalDueAmount());
+                System.out.printf("  Repayment Period: #%d, Due Date: %s, Balance: %s, Principal: %s, Interest: %s, Total: %s, Total Outstanding Balance: %s%n", rp.periodNumber(), rp.periodDueDate(), rp.getOutstandingLoanBalance(), rp.getPrincipalAmount(), rp.getInterestAmount(), rp.getTotalDueAmount(), rp.getTotalOutstandingLoanBalance());
             }
         }
     }

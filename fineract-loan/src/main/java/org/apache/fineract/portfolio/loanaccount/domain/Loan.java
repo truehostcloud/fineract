@@ -18,6 +18,7 @@
  */
 package org.apache.fineract.portfolio.loanaccount.domain;
 
+import static org.apache.fineract.portfolio.loanaccount.loanschedule.domain.LoanScheduleType.CUMULATIVE;
 import static org.apache.fineract.portfolio.loanaccount.loanschedule.domain.LoanScheduleType.PROGRESSIVE;
 
 import com.google.gson.JsonElement;
@@ -829,7 +830,7 @@ public class Loan extends AbstractAuditableWithUTCDateTimeCustom<Long> {
         return lastRepaymentDate;
     }
 
-    public void removeLoanCharge(final LoanCharge loanCharge) {
+    public Optional<ChangedTransactionDetail> removeLoanCharge(final LoanCharge loanCharge) {
         final boolean removed = loanCharge.isActive();
         if (removed) {
             loanCharge.setActive(false);
@@ -848,10 +849,12 @@ public class Loan extends AbstractAuditableWithUTCDateTimeCustom<Long> {
              * Consider removing this block of code or logically completing it for the future by getting the list of
              * affected Transactions
              */
-            reprocessTransactions();
+            return Optional.ofNullable(reprocessTransactions());
         }
         this.charges.remove(loanCharge);
         updateLoanSummaryDerivedFields();
+
+        return Optional.empty();
     }
 
     private void removeOrModifyTransactionAssociatedWithLoanChargeIfDueAtDisbursement(final LoanCharge loanCharge) {
@@ -898,37 +901,6 @@ public class Loan extends AbstractAuditableWithUTCDateTimeCustom<Long> {
     private boolean doesLoanChargePaidByContainLoanCharge(Set<LoanChargePaidBy> loanChargePaidBys, LoanCharge loanCharge) {
         return loanChargePaidBys.stream() //
                 .anyMatch(loanChargePaidBy -> loanChargePaidBy.getLoanCharge().equals(loanCharge));
-    }
-
-    public Map<String, Object> updateLoanCharge(final LoanCharge loanCharge, final JsonCommand command) {
-        final Map<String, Object> actualChanges = new LinkedHashMap<>(3);
-
-        if (getActiveCharges().contains(loanCharge)) {
-            final BigDecimal amount = calculateAmountPercentageAppliedTo(loanCharge);
-            final Map<String, Object> loanChargeChanges = loanCharge.update(command, amount);
-            actualChanges.putAll(loanChargeChanges);
-            updateSummaryWithTotalFeeChargesDueAtDisbursement(deriveSumTotalOfChargesDueAtDisbursement());
-        }
-
-        final LoanRepaymentScheduleTransactionProcessor loanRepaymentScheduleTransactionProcessor = getTransactionProcessor();
-        if (!loanCharge.isDueAtDisbursement()) {
-            /*
-             * TODO Vishwas Currently we do not allow waiving updating loan charge after a loan is approved (hence there
-             * is no need to adjust any loan transactions).
-             *
-             * Consider removing this block of code or logically completing it for the future by getting the list of
-             * affected Transactions
-             */
-            reprocessTransactions();
-        } else {
-            // reprocess loan schedule based on charge been waived.
-            final LoanRepaymentScheduleProcessingWrapper wrapper = new LoanRepaymentScheduleProcessingWrapper();
-            wrapper.reprocess(getCurrency(), getDisbursementDate(), getRepaymentScheduleInstallments(), getActiveCharges());
-        }
-
-        updateLoanSummaryDerivedFields();
-
-        return actualChanges;
     }
 
     public BigDecimal calculateAmountPercentageAppliedTo(final LoanCharge loanCharge) {
@@ -1881,10 +1853,6 @@ public class Loan extends AbstractAuditableWithUTCDateTimeCustom<Long> {
         return getStatus().isClosedWrittenOff();
     }
 
-    public boolean isClosedWithOutstandingAmountMarkedForReschedule() {
-        return getStatus().isClosedWithOutsandingAmountMarkedForReschedule();
-    }
-
     public boolean isCancelled() {
         return isRejected() || isWithdrawn();
     }
@@ -2658,6 +2626,10 @@ public class Loan extends AbstractAuditableWithUTCDateTimeCustom<Long> {
         return BigDecimal.ZERO.compareTo(getLoanRepaymentScheduleDetail().getAnnualNominalInterestRate()) < 0;
     }
 
+    public boolean isInterestBearingAndInterestRecalculationEnabled() {
+        return isInterestBearing() && isInterestRecalculationEnabled();
+    }
+
     public boolean isInterestRecalculationEnabled() {
         return this.loanRepaymentScheduleDetail.isInterestRecalculationEnabled();
     }
@@ -2689,24 +2661,32 @@ public class Loan extends AbstractAuditableWithUTCDateTimeCustom<Long> {
         return changedTransactionDetail;
     }
 
-    public void processPostDisbursementTransactions() {
+    /*
+     * Probably this is buggy when a chargeback transaction happens
+     */
+    public Optional<ChangedTransactionDetail> processPostDisbursementTransactions() {
         final LoanRepaymentScheduleTransactionProcessor loanRepaymentScheduleTransactionProcessor = getTransactionProcessor();
         final List<LoanTransaction> allNonContraTransactionsPostDisbursement = retrieveListOfTransactionsForReprocessing();
         final List<LoanTransaction> copyTransactions = new ArrayList<>();
-        if (!allNonContraTransactionsPostDisbursement.isEmpty()) {
-            for (LoanTransaction loanTransaction : allNonContraTransactionsPostDisbursement) {
-                copyTransactions.add(LoanTransaction.copyTransactionProperties(loanTransaction));
-            }
-            loanRepaymentScheduleTransactionProcessor.reprocessLoanTransactions(getDisbursementDate(), copyTransactions, getCurrency(),
-                    getRepaymentScheduleInstallments(), getActiveCharges());
 
-            updateLoanSummaryDerivedFields();
+        if (allNonContraTransactionsPostDisbursement.isEmpty()) {
+            return Optional.empty();
         }
+
+        // TODO: Probably this is not needed and can be eliminated, make sure to double check it
+        for (LoanTransaction loanTransaction : allNonContraTransactionsPostDisbursement) {
+            copyTransactions.add(LoanTransaction.copyTransactionProperties(loanTransaction));
+        }
+        final ChangedTransactionDetail changedTransactionDetail = loanRepaymentScheduleTransactionProcessor.reprocessLoanTransactions(
+                getDisbursementDate(), copyTransactions, getCurrency(), getRepaymentScheduleInstallments(), getActiveCharges());
+
+        updateLoanSummaryDerivedFields();
+
+        return Optional.of(changedTransactionDetail);
     }
 
     public LoanScheduleDTO getRecalculatedSchedule(final ScheduleGeneratorDTO generatorDTO) {
-        if (!this.repaymentScheduleDetail().isEnableDownPayment()
-                && (!this.repaymentScheduleDetail().isInterestRecalculationEnabled() || isNpa || isChargedOff())) {
+        if (!isInterestBearingAndInterestRecalculationEnabled() || isNpa || isChargedOff()) {
             return null;
         }
         final InterestMethod interestMethod = this.loanRepaymentScheduleDetail.getInterestMethod();
@@ -2726,7 +2706,7 @@ public class Loan extends AbstractAuditableWithUTCDateTimeCustom<Long> {
     public OutstandingAmountsDTO fetchPrepaymentDetail(final ScheduleGeneratorDTO scheduleGeneratorDTO, final LocalDate onDate) {
         OutstandingAmountsDTO outstandingAmounts;
 
-        if (this.loanRepaymentScheduleDetail.isInterestRecalculationEnabled() && !isChargeOffOnDate(onDate)) {
+        if (isInterestBearingAndInterestRecalculationEnabled() && !isChargeOffOnDate(onDate)) {
             final MathContext mc = MoneyHelper.getMathContext();
 
             final InterestMethod interestMethod = this.loanRepaymentScheduleDetail.getInterestMethod();
@@ -2819,7 +2799,6 @@ public class Loan extends AbstractAuditableWithUTCDateTimeCustom<Long> {
         Money totalInterest = Money.zero(getCurrency());
         Money feeCharges = Money.zero(getCurrency());
         Money penaltyCharges = Money.zero(getCurrency());
-        final Set<LoanInterestRecalcualtionAdditionalDetails> compoundingDetails = null;
         List<LoanRepaymentScheduleInstallment> repaymentSchedule = getRepaymentScheduleInstallments();
         for (final LoanRepaymentScheduleInstallment scheduledRepayment : repaymentSchedule) {
             totalPrincipal = totalPrincipal.plus(scheduledRepayment.getPrincipalOutstanding(getCurrency()));
@@ -3097,11 +3076,6 @@ public class Loan extends AbstractAuditableWithUTCDateTimeCustom<Long> {
 
     public Boolean shouldCreateStandingInstructionAtDisbursement() {
         return this.createStandingInstructionAtDisbursement != null && this.createStandingInstructionAtDisbursement;
-    }
-
-    public List<LoanCharge> getLoanChargesByDueDate(LocalDate dueDate) {
-        return getLoanCharges(
-                loanCharge -> loanCharge.getDueLocalDate() != null && DateUtils.isEqual(loanCharge.getDueLocalDate(), dueDate));
     }
 
     /**
@@ -3504,6 +3478,10 @@ public class Loan extends AbstractAuditableWithUTCDateTimeCustom<Long> {
         return Optional.ofNullable(this.charges).orElse(new HashSet<>());
     }
 
+    public void removeCharges(Predicate<LoanCharge> predicate) {
+        charges.removeIf(predicate);
+    }
+
     public boolean hasDelinquencyBucket() {
         return (getLoanProduct().getDelinquencyBucket() != null);
     }
@@ -3532,6 +3510,10 @@ public class Loan extends AbstractAuditableWithUTCDateTimeCustom<Long> {
 
     public LoanTransaction getLoanTransaction(Predicate<LoanTransaction> predicate) {
         return getLoanTransactions().stream().filter(predicate).findFirst().orElse(null);
+    }
+
+    public void removeLoanTransactions(Predicate<LoanTransaction> predicate) {
+        loanTransactions.removeIf(predicate);
     }
 
     public LoanTransaction findChargedOffTransaction() {
@@ -3576,9 +3558,30 @@ public class Loan extends AbstractAuditableWithUTCDateTimeCustom<Long> {
         return getLoanProductRelatedDetail().getLoanScheduleType() == PROGRESSIVE;
     }
 
+    public boolean isCumulativeSchedule() {
+        return getLoanProductRelatedDetail().getLoanScheduleType() == CUMULATIVE;
+    }
+
     public boolean isChargeOffOnDate(final LocalDate onDate) {
         final LoanTransaction chargeOffTransaction = findChargedOffTransaction();
         return (chargeOffTransaction == null) ? false : (chargeOffTransaction.getDateOf().compareTo(onDate) <= 0);
     }
 
+    public boolean hasMonetaryActivityAfter(final LocalDate transactionDate) {
+        for (LoanTransaction transaction : this.getLoanTransactions()) {
+            if (transaction.getTransactionDate().isAfter(transactionDate) && !transaction.isNonMonetaryTransaction()) {
+                return true;
+            }
+        }
+        for (LoanCharge loanCharge : this.getLoanCharges()) {
+            if (!loanCharge.determineIfFullyPaid() && loanCharge.getSubmittedOnDate().isAfter(transactionDate)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public boolean hasChargeOffTransaction() {
+        return getLoanTransactions().stream().anyMatch(LoanTransaction::isChargeOff);
+    }
 }
