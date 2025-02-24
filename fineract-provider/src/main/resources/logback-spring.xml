@@ -27,9 +27,9 @@
     <!-- ECS Encoder for APM -->
     <appender name="CONSOLE" target="System.out" class="ch.qos.logback.core.ConsoleAppender">
         <encoder class="co.elastic.logging.logback.EcsEncoder">
-            <serviceName>fineract-dev</serviceName>
+            <serviceName>${ELASTIC_SERVICE_NAME}</serviceName>
             <serviceVersion>1.0.0</serviceVersion>
-            <serviceEnvironment>development</serviceEnvironment>
+            <serviceEnvironment>${ELASTIC_APM_ENVIRONMENT}</serviceEnvironment>
             <includeOrigin>true</includeOrigin>
         </encoder>
     </appender>
@@ -50,9 +50,9 @@
             <appender name="JSON" class="ch.qos.logback.core.ConsoleAppender">
                 <!-- Use ECS JSON encoder instead of standard JSON -->
                 <encoder class="co.elastic.logging.logback.EcsEncoder">
-                    <serviceName>fineract-dev</serviceName>
+                    <serviceName>${ELASTIC_SERVICE_NAME}</serviceName>
                     <serviceVersion>1.0.0</serviceVersion>
-                    <serviceEnvironment>development</serviceEnvironment>
+                    <serviceEnvironment>${ELASTIC_APM_ENVIRONMENT}</serviceEnvironment>
                     <includeOrigin>true</includeOrigin>
                 </encoder>
             </appender>
