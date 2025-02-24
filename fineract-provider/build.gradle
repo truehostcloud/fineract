@@ -236,7 +236,7 @@ task setBlankPassword {
 
 bootRun {
      jvmArgs = [
-        "-javaagent:C:/Users/admin/Downloads/elastic-apm-agent-1.52.1.jar",
+        "-javaagent:${System.getenv('ELASTIC_APM_AGENT_PATH')}",
         "-Delastic.apm.service_name=fineract-dev",
         "-Delastic.apm.server_url=https://apm.jisort.com",
         "-Delastic.apm.environment=development",
