@@ -113,6 +113,8 @@ dependencies {
     implementation 'org.junit.jupiter:junit-jupiter-api'
     implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
     implementation 'org.liquibase:liquibase-core'
+    implementation 'co.elastic.apm:apm-agent-api:1.52.1'
+    implementation 'co.elastic.logging:logback-ecs-encoder:1.5.0'
 }
 
 apply from: 'dependencies.gradle'
@@ -233,7 +235,20 @@ task setBlankPassword {
 }
 
 bootRun {
-    jvmArgs = [
+     jvmArgs = [
+        "-javaagent:C:/Users/admin/Downloads/elastic-apm-agent-1.52.1.jar",
+        "-Delastic.apm.service_name=fineract-dev",
+        "-Delastic.apm.server_url=https://apm.jisort.com",
+        "-Delastic.apm.environment=development",
+        "-Delastic.apm.application_packages=org.apache.fineract",
+        "-Delastic.apm.log_level=INFO",
+        "-Delastic.apm.enable_log_correlation=true",
+        "-Delastic.apm.trace_methods=org.apache.fineract.*,com.acme.fineract.*",
+        "-Delastic.apm.transaction_sample_rate=1",
+        "-Delastic.apm.capture_body=all",
+        "-Delastic.apm.capture_headers=true",
+        "-Delastic.apm.stack_trace_limit=50",
+        "-Delastic.apm.span_frames_min_duration=0ms",
         "-Dspring.output.ansi.enabled=ALWAYS"
     ]
 
