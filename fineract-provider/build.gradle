@@ -235,19 +235,28 @@ task setBlankPassword {
 }
 
 bootRun {
-     jvmArgs = [
-        "-javaagent:${System.getenv('ELASTIC_APM_AGENT_PATH')}",
-        "-Delastic.apm.application_packages=org.apache.fineract",
-        "-Delastic.apm.log_level=INFO",
-        "-Delastic.apm.enable_log_correlation=true",
-        "-Delastic.apm.trace_methods=org.apache.fineract.*,com.acme.fineract.*",
-        "-Delastic.apm.transaction_sample_rate=1",
-        "-Delastic.apm.capture_body=all",
-        "-Delastic.apm.capture_headers=true",
-        "-Delastic.apm.stack_trace_limit=50",
-        "-Delastic.apm.span_frames_min_duration=0ms",
-        "-Dspring.output.ansi.enabled=ALWAYS"
-    ]
+
+     def apmAgentPath = System.getenv('ELASTIC_APM_AGENT_PATH')
+    
+    // Always present JVM args - define as a list
+    jvmArgs = ["-Dspring.output.ansi.enabled=ALWAYS"]
+    
+    // Add APM arguments only if the agent file exists
+    if (apmAgentPath && new File(apmAgentPath).exists()) {
+        jvmArgs += [
+            "-javaagent:${apmAgentPath}",
+            "-Delastic.apm.application_packages=org.apache.fineract",
+            "-Delastic.apm.log_level=INFO",
+            "-Delastic.apm.enable_log_correlation=true",
+            "-Delastic.apm.trace_methods=org.apache.fineract.*,com.acme.fineract.*",
+            "-Delastic.apm.transaction_sample_rate=1",
+            "-Delastic.apm.capture_body=all",
+            "-Delastic.apm.capture_headers=true",
+            "-Delastic.apm.stack_trace_limit=50",
+            "-Delastic.apm.span_frames_min_duration=0ms"
+        ]
+    }
+
 
     dependencies {
         implementation 'org.mariadb.jdbc:mariadb-java-client'
