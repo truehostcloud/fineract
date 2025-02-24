@@ -238,10 +238,8 @@ bootRun {
 
      def apmAgentPath = System.getenv('ELASTIC_APM_AGENT_PATH')
     
-    // Always present JVM args - define as a list
     jvmArgs = ["-Dspring.output.ansi.enabled=ALWAYS"]
     
-    // Add APM arguments only if the agent file exists
     if (apmAgentPath && new File(apmAgentPath).exists()) {
         jvmArgs += [
             "-javaagent:${apmAgentPath}",
