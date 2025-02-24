@@ -237,7 +237,7 @@ task setBlankPassword {
 bootRun {
      jvmArgs = [
         "-javaagent:${System.getenv('ELASTIC_APM_AGENT_PATH')}",
-        "-Delastic.apm.service_name=${System.getenv('ELASTIC_SERVICE_NAME')}",
+        "-Delastic.apm.service_name=${System.getenv('ELASTIC_APM_SERVICE_NAME')}",
         "-Delastic.apm.server_url=${System.getenv('ELASTIC_APM_SERVER_URL')}",
         "-Delastic.apm.environment=${System.getenv('ELASTIC_APM_ENVIRONMENT')}",
         "-Delastic.apm.application_packages=org.apache.fineract",
