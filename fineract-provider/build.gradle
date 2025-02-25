@@ -113,6 +113,8 @@ dependencies {
     implementation 'org.junit.jupiter:junit-jupiter-api'
     implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
     implementation 'org.liquibase:liquibase-core'
+    implementation 'co.elastic.apm:apm-agent-api:1.52.1'
+    implementation 'co.elastic.logging:logback-ecs-encoder:1.5.0'
 }
 
 apply from: 'dependencies.gradle'
@@ -233,9 +235,19 @@ task setBlankPassword {
 }
 
 bootRun {
-    jvmArgs = [
-        "-Dspring.output.ansi.enabled=ALWAYS"
-    ]
+
+     def apmAgentPath = System.getenv('ELASTIC_APM_AGENT_PATH')
+    
+    jvmArgs = ["-Dspring.output.ansi.enabled=ALWAYS"]
+    
+    if (apmAgentPath && new File(apmAgentPath).exists()) {
+        jvmArgs += [
+            "-javaagent:${apmAgentPath}",
+            "-Delastic.apm.application_packages=org.apache.fineract",
+            "-Delastic.apm.trace_methods=org.apache.fineract.*,com.acme.fineract.*",
+        ]
+    }
+
 
     dependencies {
         implementation 'org.mariadb.jdbc:mariadb-java-client'
