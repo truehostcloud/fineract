@@ -30,4 +30,4 @@ jobs:
         id: extract_branch
       - name: Build the Apache Fineract image
         run:  |
-          ./gradlew --no-daemon --console=plain :fineract-provider:jib -x test -x cucumber -Djib.to.auth.username=${{secrets.DOCKERHUB_USER}} -Djib.to.auth.password=${{secrets.DOCKERHUB_TOKEN}} -Djib.from.platforms=linux/amd64,linux/arm64 -Djib.to.image=apache/fineract -Djib.to.tags=${{ steps.extract_branch.outputs.branch }}
+          ./gradlew --no-daemon --console=plain :fineract-provider:jib -x test -x cucumber -Djib.to.auth.username=${{secrets.DOCKERHUB_USERNAME}} -Djib.to.auth.password=${{secrets.DOCKERHUB_PASSWORD}} -Djib.from.platforms=linux/amd64,linux/arm64 -Djib.to.image=truehostcloud/fineract-base -Djib.to.tags=${{ steps.extract_branch.outputs.branch }}
