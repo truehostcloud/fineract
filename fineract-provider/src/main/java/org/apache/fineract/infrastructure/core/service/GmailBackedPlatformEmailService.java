@@ -42,8 +42,9 @@ public class GmailBackedPlatformEmailService implements PlatformEmailService {
 
         final String subject = "Welcome " + contactName + " to " + organisationName;
         final String body = "You are receiving this email as your email account: " + address
-                + " has being used to create a user account for an organisation named [" + organisationName + "] on Jisort.\n"
+                + " has being used to create a user account for an organisation named [" + organisationName + "] on Mifos.\n"
                 + "You can login using the following credentials:\nusername: " + username + "\n" + "password: " + unencodedPassword + "\n"
+                + "You must change this password upon first log in using Uppercase, Lowercase, number and character.\n"
                 + "Thank you and welcome to the organisation.";
 
         final EmailDetail emailDetail = new EmailDetail(subject, body, address, contactName);
