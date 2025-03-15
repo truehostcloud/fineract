@@ -16,17 +16,21 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.fineract.cob.data;
+package org.apache.fineract.portfolio.note.data;
 
+import java.io.Serial;
+import java.io.Serializable;
 import lombok.AllArgsConstructor;
-import lombok.Getter;
-import org.apache.fineract.infrastructure.core.domain.ExternalId;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
+@Data
+@NoArgsConstructor
 @AllArgsConstructor
-@Getter
-public class LoanIdAndExternalIdAndStatus {
+public class NoteRequest implements Serializable {
 
-    Long id;
-    ExternalId externalId;
-    Integer loanStatus;
+    @Serial
+    private static final long serialVersionUID = 1L;
+
+    private String note;
 }

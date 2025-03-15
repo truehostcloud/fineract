@@ -1058,4 +1058,14 @@ public class LoanRepaymentScheduleInstallment extends AbstractAuditableWithUTCDa
     public enum PaymentAction {
         PAY, UNPAY
     }
+
+    public boolean isTransactionDateWithinPeriod(LocalDate referenceDate) {
+        return DateUtils.isAfter(referenceDate, getFromDate()) && !DateUtils.isAfter(referenceDate, getDueDate());
+    }
+
+    public boolean isDueBalanceZero() {
+        return MathUtil.isZero(
+                MathUtil.nullToZero(MathUtil.add(getPrincipal(), getInterestCharged(), getFeeChargesCharged(), getPenaltyCharges())));
+    }
+
 }

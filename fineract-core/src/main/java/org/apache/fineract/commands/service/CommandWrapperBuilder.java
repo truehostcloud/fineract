@@ -799,6 +799,15 @@ public class CommandWrapperBuilder {
         return this;
     }
 
+    public CommandWrapperBuilder deactivateOverdueLoanCharges(final Long loanId, final Long loanChargeId) {
+        this.actionName = "DEACTIVATEOVERDUE";
+        this.entityName = "LOANCHARGE";
+        this.entityId = loanChargeId;
+        this.loanId = loanId;
+        this.href = "/loans/" + loanId + "/charges/" + loanChargeId;
+        return this;
+    }
+
     public CommandWrapperBuilder deleteLoanCharge(final Long loanId, final Long loanChargeId) {
         this.actionName = "DELETE";
         this.entityName = "LOANCHARGE";
@@ -3658,6 +3667,14 @@ public class CommandWrapperBuilder {
         this.productId = loanProductId;
         this.entityId = attributeId;
         this.href = "/external-asset-owners/loan-product/" + loanProductId + "/attributes/" + attributeId;
+        return this;
+    }
+
+    public CommandWrapperBuilder intermediarySaleLoanToExternalAssetOwner(final Long loanId) {
+        this.actionName = "INTERMEDIARYSALE";
+        this.entityName = "LOAN";
+        this.loanId = loanId;
+        this.href = "/external-asset-owners/transfers/loans/" + loanId;
         return this;
     }
 

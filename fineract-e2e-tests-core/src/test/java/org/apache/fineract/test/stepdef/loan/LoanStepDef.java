@@ -28,6 +28,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.google.gson.Gson;
@@ -49,6 +50,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
@@ -118,10 +120,13 @@ import org.apache.fineract.test.helper.ErrorResponse;
 import org.apache.fineract.test.helper.Utils;
 import org.apache.fineract.test.initializer.global.LoanProductGlobalInitializerStep;
 import org.apache.fineract.test.messaging.EventAssertion;
+import org.apache.fineract.test.messaging.config.EventProperties;
 import org.apache.fineract.test.messaging.event.EventCheckHelper;
 import org.apache.fineract.test.messaging.event.loan.LoanRescheduledDueAdjustScheduleEvent;
 import org.apache.fineract.test.messaging.event.loan.LoanStatusChangedEvent;
+import org.apache.fineract.test.messaging.event.loan.transaction.LoanAccrualAdjustmentTransactionBusinessEvent;
 import org.apache.fineract.test.messaging.event.loan.transaction.LoanAccrualTransactionCreatedBusinessEvent;
+import org.apache.fineract.test.messaging.event.loan.transaction.LoanAdjustTransactionBusinessEvent;
 import org.apache.fineract.test.messaging.event.loan.transaction.LoanChargeAdjustmentPostBusinessEvent;
 import org.apache.fineract.test.messaging.event.loan.transaction.LoanChargeOffEvent;
 import org.apache.fineract.test.messaging.event.loan.transaction.LoanChargeOffUndoEvent;
@@ -188,6 +193,9 @@ public class LoanStepDef extends AbstractStepDef {
 
     @Autowired
     private LoanInterestPauseApi loanInterestPauseApi;
+
+    @Autowired
+    private EventProperties eventProperties;
 
     @When("Admin creates a new Loan")
     public void createLoan() throws IOException {
@@ -1985,7 +1993,6 @@ public class LoanStepDef extends AbstractStepDef {
     private List<List<String>> getActualValuesList(List<GetLoansLoanIdLoanChargeData> charges, String paymentDueAtExpected,
             String dueAsOfExpected) {
         List<GetLoansLoanIdLoanChargeData> result;
-
         if (dueAsOfExpected != null) {
             result = charges.stream().filter(t -> {
                 LocalDate dueDate = t.getDueDate();
@@ -1995,7 +2002,6 @@ public class LoanStepDef extends AbstractStepDef {
             result = charges.stream().filter(t -> paymentDueAtExpected.equals(t.getChargeTimeType().getValue()))
                     .collect(Collectors.toList());
         }
-
         return result.stream().map(t -> {
             List<String> actualValues = new ArrayList<>();
             actualValues.add(t.getName() == null ? null : t.getName());
@@ -2003,10 +2009,13 @@ public class LoanStepDef extends AbstractStepDef {
             actualValues.add(t.getChargeTimeType().getValue() == null ? null : t.getChargeTimeType().getValue());
             actualValues.add(t.getDueDate() == null ? null : FORMATTER.format(t.getDueDate()));
             actualValues.add(t.getChargeCalculationType().getValue() == null ? null : t.getChargeCalculationType().getValue());
-            actualValues.add(t.getAmount() == null ? null : String.valueOf(t.getAmount()));
-            actualValues.add(t.getAmountPaid() == null ? null : String.valueOf(t.getAmountPaid()));
-            actualValues.add(t.getAmountWaived() == null ? null : String.valueOf(t.getAmountWaived()));
-            actualValues.add(t.getAmountOutstanding() == null ? null : String.valueOf(t.getAmountOutstanding()));
+
+            actualValues.add(t.getAmount() == null ? null : new Utils.DoubleFormatter(t.getAmount()).format());
+
+            actualValues.add(t.getAmountPaid() == null ? null : new Utils.DoubleFormatter(t.getAmountPaid()).format());
+            actualValues.add(t.getAmountWaived() == null ? null : new Utils.DoubleFormatter(t.getAmountWaived()).format());
+
+            actualValues.add(t.getAmountOutstanding() == null ? null : new Utils.DoubleFormatter(t.getAmountOutstanding()).format());
             return actualValues;
         }).collect(Collectors.toList());
     }
@@ -2233,8 +2242,11 @@ public class LoanStepDef extends AbstractStepDef {
         long loanId = loanResponse.body().getLoanId();
 
         LoanStatusEnumDataV1 expectedStatus = getExpectedStatus(loanStatus);
-        eventAssertion.assertEvent(LoanStatusChangedEvent.class, loanId).extractingData(LoanAccountDataV1::getStatus)
-                .isEqualTo(expectedStatus);
+        await().pollDelay(Duration.ofSeconds(1L)).pollInterval(Duration.ofSeconds(1L))
+                .atMost(Duration.ofSeconds(eventProperties.getEventWaitTimeoutInSec())).untilAsserted(() -> {
+                    eventAssertion.assertEvent(LoanStatusChangedEvent.class, loanId).extractingData(LoanAccountDataV1::getStatus)
+                            .isEqualTo(expectedStatus);
+                });
     }
 
     @Then("Loan marked as charged-off on {string}")
@@ -2327,6 +2339,23 @@ public class LoanStepDef extends AbstractStepDef {
         eventAssertion.assertEventRaised(LoanAccrualTransactionCreatedBusinessEvent.class, accrualTransactionId);
     }
 
+    @Then("LoanAccrualAdjustmentTransactionBusinessEvent is raised on {string}")
+    public void checkLoanAccrualAdjustmentTransactionBusinessEvent(String date) throws IOException {
+        Response<PostLoansResponse> loanCreateResponse = testContext().get(TestContextKey.LOAN_CREATE_RESPONSE);
+        long loanId = loanCreateResponse.body().getLoanId();
+
+        Response<GetLoansLoanIdResponse> loanDetailsResponse = loansApi.retrieveLoan(loanId, false, "transactions", "", "").execute();
+        ErrorHelper.checkSuccessfulApiCall(loanDetailsResponse);
+
+        List<GetLoansLoanIdTransactions> transactions = loanDetailsResponse.body().getTransactions();
+        GetLoansLoanIdTransactions accrualAdjustmentTransaction = transactions.stream()
+                .filter(t -> date.equals(FORMATTER.format(t.getDate())) && "Accrual Adjustment".equals(t.getType().getValue())).findFirst()
+                .orElseThrow(() -> new IllegalStateException(String.format("No Accrual Adjustment transaction found on %s", date)));
+        Long accrualAdjustmentTransactionId = accrualAdjustmentTransaction.getId();
+
+        eventAssertion.assertEventRaised(LoanAccrualAdjustmentTransactionBusinessEvent.class, accrualAdjustmentTransactionId);
+    }
+
     @Then("LoanChargeAdjustmentPostBusinessEvent is raised on {string}")
     public void checkLoanChargeAdjustmentPostBusinessEvent(String date) throws IOException {
         Response<PostLoansResponse> loanCreateResponse = testContext().get(TestContextKey.LOAN_CREATE_RESPONSE);
@@ -2356,6 +2385,88 @@ public class LoanStepDef extends AbstractStepDef {
 
         assertThat(transactions).as("Unexpected Accrual activity transaction found on %s", date)
                 .noneMatch(t -> date.equals(FORMATTER.format(t.getDate())) && "Accrual Activity".equals(t.getType().getValue()));
+    }
+
+    @Then("{string} transaction on {string} got reverse-replayed on {string}")
+    public void checkLoanAdjustTransactionBusinessEvent(String transactionType, String transactionDate, String submittedOnDate)
+            throws IOException {
+        Response<PostLoansResponse> loanCreateResponse = testContext().get(TestContextKey.LOAN_CREATE_RESPONSE);
+        long loanId = loanCreateResponse.body().getLoanId();
+
+        Response<GetLoansLoanIdResponse> loanDetailsResponse = loansApi.retrieveLoan(loanId, false, "transactions", "", "").execute();
+        ErrorHelper.checkSuccessfulApiCall(loanDetailsResponse);
+
+        List<GetLoansLoanIdTransactions> transactions = loanDetailsResponse.body().getTransactions();
+
+        GetLoansLoanIdTransactions loadTransaction = transactions.stream()
+                .filter(t -> transactionDate.equals(FORMATTER.format(t.getDate())) && transactionType.equals(t.getType().getValue()))
+                .findFirst().orElseThrow(
+                        () -> new IllegalStateException(String.format("No %s transaction found on %s", transactionType, transactionDate)));
+
+        Set<GetLoansLoanIdLoanTransactionRelation> transactionRelations = loadTransaction.getTransactionRelations();
+        Long originalTransactionId = transactionRelations.stream().map(GetLoansLoanIdLoanTransactionRelation::getToLoanTransaction)
+                .filter(Objects::nonNull).findFirst()
+                .orElseThrow(() -> new IllegalStateException("Transaction was reversed, but not replayed!"));
+
+        // Check whether reverse-replay event got occurred
+        eventAssertion.assertEvent(LoanAdjustTransactionBusinessEvent.class, originalTransactionId).extractingData(
+                e -> e.getNewTransactionDetail() != null && e.getNewTransactionDetail().getId().equals(loadTransaction.getId()));
+        // Check whether there was just ONE event related to this transaction
+        eventAssertion.assertEventNotRaised(LoanAdjustTransactionBusinessEvent.class, originalTransactionId);
+        assertThat(FORMATTER.format(loadTransaction.getSubmittedOnDate()))
+                .as("Loan got replayed on %s", loadTransaction.getSubmittedOnDate()).isEqualTo(submittedOnDate);
+    }
+
+    @When("Save external ID of {string} transaction made on {string} as {string}")
+    public void saveExternalIdForTransaction(String transactionName, String transactionDate, String externalIdKey) throws IOException {
+        Response<PostLoansResponse> loanCreateResponse = testContext().get(TestContextKey.LOAN_CREATE_RESPONSE);
+        long loanId = loanCreateResponse.body().getLoanId();
+
+        Response<GetLoansLoanIdResponse> loanDetailsResponse = loansApi.retrieveLoan(loanId, false, "transactions", "", "").execute();
+        ErrorHelper.checkSuccessfulApiCall(loanDetailsResponse);
+
+        List<GetLoansLoanIdTransactions> transactions = loanDetailsResponse.body().getTransactions();
+
+        GetLoansLoanIdTransactions loadTransaction = transactions.stream()
+                .filter(t -> transactionDate.equals(FORMATTER.format(t.getDate())) && transactionName.equals(t.getType().getValue()))
+                .findFirst().orElseThrow(
+                        () -> new IllegalStateException(String.format("No %s transaction found on %s", transactionName, transactionDate)));
+
+        String externalId = loadTransaction.getExternalId();
+        testContext().set(externalIdKey, externalId);
+        log.debug("Transaction external ID: {} saved to testContext", externalId);
+    }
+
+    @Then("External ID of replayed {string} on {string} is matching with {string}")
+    public void checkExternalIdForReplayedAccrualActivity(String transactionType, String transactionDate, String savedExternalIdKey)
+            throws IOException {
+        Response<PostLoansResponse> loanCreateResponse = testContext().get(TestContextKey.LOAN_CREATE_RESPONSE);
+        long loanId = loanCreateResponse.body().getLoanId();
+
+        Response<GetLoansLoanIdResponse> loanDetailsResponse = loansApi.retrieveLoan(loanId, false, "transactions", "", "").execute();
+        ErrorHelper.checkSuccessfulApiCall(loanDetailsResponse);
+
+        List<GetLoansLoanIdTransactions> transactions = loanDetailsResponse.body().getTransactions();
+
+        GetLoansLoanIdTransactions transactionDetails = transactions.stream()
+                .filter(t -> transactionDate.equals(FORMATTER.format(t.getDate())) && transactionType.equals(t.getType().getValue()))
+                .findFirst().orElseThrow(
+                        () -> new IllegalStateException(String.format("No %s transaction found on %s", transactionType, transactionDate)));
+
+        Set<GetLoansLoanIdLoanTransactionRelation> transactionRelations = transactionDetails.getTransactionRelations();
+        Long originalTransactionId = transactionRelations.stream().map(GetLoansLoanIdLoanTransactionRelation::getToLoanTransaction)
+                .filter(Objects::nonNull).findFirst()
+                .orElseThrow(() -> new IllegalStateException("Transaction was reversed, but not replayed!"));
+
+        String externalIdExpected = testContext().get(savedExternalIdKey).toString();
+        String externalIdActual = transactionDetails.getExternalId();
+        assertThat(externalIdActual).as(ErrorMessageHelper.wrongExternalID(externalIdActual, externalIdExpected))
+                .isEqualTo(externalIdExpected);
+
+        Response<GetLoansLoanIdTransactionsTransactionIdResponse> originalTransaction = loanTransactionsApi
+                .retrieveTransaction(loanId, originalTransactionId, "").execute();
+        assertNull(String.format("Original transaction external id is not null %n%s", originalTransaction.body()),
+                originalTransaction.body().getExternalId());
     }
 
     @Then("LoanTransactionAccrualActivityPostBusinessEvent is raised on {string}")
@@ -3196,12 +3307,12 @@ public class LoanStepDef extends AbstractStepDef {
                     actualValues.add(repaymentPeriod.getPrincipalDue() == null ? null : String.valueOf(repaymentPeriod.getPrincipalDue()));
                 case "Interest" ->
                     actualValues.add(repaymentPeriod.getInterestDue() == null ? null : String.valueOf(repaymentPeriod.getInterestDue()));
-                case "Fees" -> actualValues
-                        .add(repaymentPeriod.getFeeChargesDue() == null ? null : String.valueOf(repaymentPeriod.getFeeChargesDue()));
-                case "Penalties" -> actualValues.add(
-                        repaymentPeriod.getPenaltyChargesDue() == null ? null : String.valueOf(repaymentPeriod.getPenaltyChargesDue()));
-                case "Due" -> actualValues.add(
-                        repaymentPeriod.getTotalDueForPeriod() == null ? null : String.valueOf(repaymentPeriod.getTotalDueForPeriod()));
+                case "Fees" -> actualValues.add(repaymentPeriod.getFeeChargesDue() == null ? null
+                        : new Utils.DoubleFormatter(repaymentPeriod.getFeeChargesDue()).format());
+                case "Penalties" -> actualValues.add(repaymentPeriod.getPenaltyChargesDue() == null ? null
+                        : new Utils.DoubleFormatter(repaymentPeriod.getPenaltyChargesDue()).format());
+                case "Due" -> actualValues.add(repaymentPeriod.getTotalDueForPeriod() == null ? null
+                        : new Utils.DoubleFormatter(repaymentPeriod.getTotalDueForPeriod()).format());
                 case "Paid" -> actualValues.add(
                         repaymentPeriod.getTotalPaidForPeriod() == null ? null : String.valueOf(repaymentPeriod.getTotalPaidForPeriod()));
                 case "In advance" -> actualValues.add(repaymentPeriod.getTotalPaidInAdvanceForPeriod() == null ? null
@@ -3211,7 +3322,7 @@ public class LoanStepDef extends AbstractStepDef {
                 case "Waived" -> actualValues.add(repaymentPeriod.getTotalWaivedForPeriod() == null ? null
                         : String.valueOf(repaymentPeriod.getTotalWaivedForPeriod()));
                 case "Outstanding" -> actualValues.add(repaymentPeriod.getTotalOutstandingForPeriod() == null ? null
-                        : String.valueOf(repaymentPeriod.getTotalOutstandingForPeriod()));
+                        : new Utils.DoubleFormatter(repaymentPeriod.getTotalOutstandingForPeriod()).format());
                 default -> throw new IllegalStateException(String.format("Header name %s cannot be found", headerName));
             }
         }
