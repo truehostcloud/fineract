@@ -6078,6 +6078,7 @@ Feature: Loan
       | 15 February 2024 | Accrual          | 0.82   |   0.0     | 0.82     | 0.0  | 0.0       | 0.0          | false    |
     Then Loan's all installments have obligations met
 
+  @TestRailId:C3483
   Scenario: Early pay-off loan with interest, TILL_REST_FREQUENCY_DATE product
     When Admin sets the business date to "01 January 2024"
     When Admin creates a client with random data
@@ -6140,6 +6141,7 @@ Feature: Loan
     Then Loan's all installments have obligations met
     When Admin set "LP2_ADV_PYMNT_INTEREST_DAILY_EMI_360_30_INTEREST_RECALCULATION_DAILY_TILL_REST_FREQUENCY_DATE" loan product "DEFAULT" transaction type to "LAST_INSTALLMENT" future installment allocation rule
 
+  @TestRailId:C3484
   Scenario: Interest recalculation - S1 daily for overdue loan
     Given Global configuration "enable-business-date" is enabled
     When Admin sets the business date to "1 January 2024"
@@ -6161,6 +6163,7 @@ Feature: Loan
       | 5  | 31   | 01 June 2024     |           | 17.85           | 16.43         | 0.58     | 0.0  | 0.0       | 17.01 | 0.0  | 0.0        | 0.0  | 17.01       |
       | 6  | 30   | 01 July 2024     |           | 0.0             | 17.85         | 0.58     | 0.0  | 0.0       | 18.43 | 0.0  | 0.0        | 0.0  | 18.43       |
 
+  @TestRailId:C3485
   Scenario: Interest recalculation - S2 2 overdue
     Given Global configuration "enable-business-date" is enabled
     When Admin sets the business date to "1 January 2024"
@@ -6182,6 +6185,7 @@ Feature: Loan
       | 5  | 31   | 01 June 2024     |           | 17.06           | 16.81         | 0.2      | 0.0  | 0.0       | 17.01 | 0.0  | 0.0        | 0.0  | 17.01       |
       | 6  | 30   | 01 July 2024     |           | 0.0             | 17.06         | 0.1      | 0.0  | 0.0       | 17.16 | 0.0  | 0.0        | 0.0  | 17.16       |
 
+  @TestRailId:C3486
   Scenario: Interest recalculation - S3 1 paid, 1 overdue
     Given Global configuration "enable-business-date" is enabled
     When Admin sets the business date to "1 January 2024"
@@ -6205,6 +6209,7 @@ Feature: Loan
       | 5  | 31   | 01 June 2024     |                  | 16.93           | 16.81         | 0.2      | 0.0  | 0.0       | 17.01 | 0.0   | 0.0        | 0.0  | 17.01       |
       | 6  | 30   | 01 July 2024     |                  | 0.0             | 16.93         | 0.1      | 0.0  | 0.0       | 17.03 | 0.0   | 0.0        | 0.0  | 17.03       |
 
+  @TestRailId:C3487
   Scenario: Loan Details Emi Amount Variations - AssociationsAll
     Given Global configuration "is-interest-to-be-recovered-first-when-greater-than-emi" is enabled
     Given Global configuration "enable-business-date" is enabled
@@ -6219,6 +6224,7 @@ Feature: Loan
       | Term Type Id | Term Type Code         | Term Type Value | Applicable From | Decimal Value | Date Value      | Is Specific To Installment | Is Processed |
       | 1            | loanTermType.emiAmount | emiAmount       | 01 January 2023 | 50.0          |                 | false                      |              |
 
+  @TestRailId:C3488
   Scenario: Loan Details Loan Term Variations
     Given Global configuration "is-interest-to-be-recovered-first-when-greater-than-emi" is enabled
     Given Global configuration "enable-business-date" is enabled
@@ -6234,6 +6240,7 @@ Feature: Loan
       | 1            | loanTermType.emiAmount | emiAmount       | 01 January 2023  | 50.0          |                 | false                      |              |
       | 4            | loanTermType.dueDate   | dueDate         | 01 February 2023 | 50.0          | 15 January 2023 | false                      |              |
 
+  @TestRailId:C3489
   Scenario: EMI calculation with 360/30 Early repayment - Last installment strategy - UC1: Multiple early repayment
     When Admin sets the business date to "01 January 2024"
     When Admin creates a client with random data
@@ -6355,4 +6362,83 @@ Feature: Loan
       | 23 December 2024 | Disbursement     | 100.0  | 0.0       | 0.0      | 0.0  | 0.0       | 100.0        |
       | 22 March 2025    | Accrual          | 0.67   | 0.0       | 0.67     | 0.0  | 0.0       |  0.0         |
 
-
+  @TestRailId:C3534 @AdvancedPaymentAllocation
+  Scenario: Verify advanced payment allocation - future installments: LAST_INSTALLMENT, full Merchant issued Refund on the disbursement date, 2nd disbursement on the same date
+    When Admin sets the business date to "11 March 2025"
+    And Admin creates a client with random data
+    When Admin set "LP2_ADV_PYMNT_INTEREST_DAILY_EMI_ACTUAL_ACTUAL_INTEREST_REFUND_FULL" loan product "MERCHANT_ISSUED_REFUND" transaction type to "LAST_INSTALLMENT" future installment allocation rule
+    When Admin creates a fully customized loan with the following data:
+      | LoanProduct                                                         | submitted on date | with Principal | ANNUAL interest rate % | interest type              | interest calculation period | amortization type  | loanTermFrequency | loanTermFrequencyType | repaymentEvery | repaymentFrequencyType | numberOfRepayments | graceOnPrincipalPayment | graceOnInterestPayment | interest free period | Payment strategy            |
+      | LP2_ADV_PYMNT_INTEREST_DAILY_EMI_ACTUAL_ACTUAL_INTEREST_REFUND_FULL | 11 March 2025     | 1000           | 26                     | DECLINING_BALANCE          | DAILY                       | EQUAL_INSTALLMENTS | 12                | MONTHS                | 1              | MONTHS                 | 12                 | 0                       | 0                      | 0                    | ADVANCED_PAYMENT_ALLOCATION |
+    And Admin successfully approves the loan on "11 March 2025" with "1000" amount and expected disbursement date on "11 March 2025"
+    And Admin successfully disburse the loan on "11 March 2025" with "200" EUR transaction amount
+    Then Loan Repayment schedule has 12 periods, with the following data for periods:
+      | Nr | Days | Date              | Paid date         | Balance of loan | Principal due | Interest | Fees | Penalties | Due   | Paid  | In advance | Late | Outstanding |
+      |    |      | 11 March 2025     |                   | 200.0           |               |          | 0.0  |           | 0.0   | 0.0   |            |      |             |
+      | 1  | 31   | 11 April 2025     |                   | 185.3           | 14.7          | 4.42     | 0.0  | 0.0       | 19.12 | 0.0   | 0.0        | 0.0  | 19.12       |
+      | 2  | 30   | 11 May 2025       |                   | 170.14          | 15.16         | 3.96     | 0.0  | 0.0       | 19.12 | 0.0   | 0.0        | 0.0  | 19.12       |
+      | 3  | 31   | 11 June 2025      |                   | 154.78          | 15.36         | 3.76     | 0.0  | 0.0       | 19.12 | 0.0   | 0.0        | 0.0  | 19.12       |
+      | 4  | 30   | 11 July 2025      |                   | 138.97          | 15.81         | 3.31     | 0.0  | 0.0       | 19.12 | 0.0   | 0.0        | 0.0  | 19.12       |
+      | 5  | 31   | 11 August 2025    |                   | 122.92          | 16.05         | 3.07     | 0.0  | 0.0       | 19.12 | 0.0   | 0.0        | 0.0  | 19.12       |
+      | 6  | 31   | 11 September 2025 |                   | 106.51          | 16.41         | 2.71     | 0.0  | 0.0       | 19.12 | 0.0   | 0.0        | 0.0  | 19.12       |
+      | 7  | 30   | 11 October 2025   |                   |  89.67          | 16.84         | 2.28     | 0.0  | 0.0       | 19.12 | 0.0   | 0.0        | 0.0  | 19.12       |
+      | 8  | 31   | 11 November 2025  |                   |  72.53          | 17.14         | 1.98     | 0.0  | 0.0       | 19.12 | 0.0   | 0.0        | 0.0  | 19.12       |
+      | 9  | 30   | 11 December 2025  |                   |  54.96          | 17.57         | 1.55     | 0.0  | 0.0       | 19.12 | 0.0   | 0.0        | 0.0  | 19.12       |
+      | 10 | 31   | 11 January 2026   |                   |  37.05          | 17.91         | 1.21     | 0.0  | 0.0       | 19.12 | 0.0   | 0.0        | 0.0  | 19.12       |
+      | 11 | 31   | 11 February 2026  |                   |  18.75          | 18.3          | 0.82     | 0.0  | 0.0       | 19.12 | 0.0   | 0.0        | 0.0  | 19.12       |
+      | 12 | 28   | 11 March 2026     |                   |    0.0          | 18.75         | 0.37     | 0.0  | 0.0       | 19.12 | 0.0   | 0.0        | 0.0  | 19.12       |
+    Then Loan Repayment schedule has the following data in Total row:
+      | Principal due | Interest | Fees | Penalties | Due    | Paid  | In advance | Late | Outstanding |
+      | 200.0         | 29.44    | 0.0  | 0         | 229.44 | 0.0   | 0.0        | 0.0  | 229.44      |
+    Then Loan Transactions tab has the following data:
+      | Transaction date  | Transaction Type | Amount | Principal | Interest | Fees | Penalties | Loan Balance |
+      | 11 March 2025     | Disbursement     | 200.0  | 0.0       | 0.0      | 0.0  | 0.0       | 200.0        |
+    When Customer makes "MERCHANT_ISSUED_REFUND" transaction with "AUTOPAY" payment type on "11 March 2025" with 200 EUR transaction amount and system-generated Idempotency key
+    Then Loan Repayment schedule has 12 periods, with the following data for periods:
+      | Nr | Days | Date              | Paid date         | Balance of loan | Principal due | Interest | Fees | Penalties | Due   | Paid  | In advance | Late | Outstanding |
+      |    |      | 11 March 2025     |                   | 200.0           |               |          | 0.0  |           | 0.0   | 0.0   |            |      |             |
+      | 1  | 31   | 11 April 2025     | 11 March 2025     | 200.0           |   0.0         | 0.0      | 0.0  | 0.0       | 0.0   | 0.0   | 0.0        | 0.0  | 0.0         |
+      | 2  | 30   | 11 May 2025       | 11 March 2025     | 191.2           |   8.8         | 0.0      | 0.0  | 0.0       | 8.8   | 8.8   | 8.8        | 0.0  | 0.0         |
+      | 3  | 31   | 11 June 2025      | 11 March 2025     | 172.08          | 19.12         | 0.0      | 0.0  | 0.0       | 19.12 | 19.12 | 19.12      | 0.0  | 0.0         |
+      | 4  | 30   | 11 July 2025      | 11 March 2025     | 152.96          | 19.12         | 0.0      | 0.0  | 0.0       | 19.12 | 19.12 | 19.12      | 0.0  | 0.0         |
+      | 5  | 31   | 11 August 2025    | 11 March 2025     | 133.84          | 19.12         | 0.0      | 0.0  | 0.0       | 19.12 | 19.12 | 19.12      | 0.0  | 0.0         |
+      | 6  | 31   | 11 September 2025 | 11 March 2025     | 114.72          | 19.12         | 0.0      | 0.0  | 0.0       | 19.12 | 19.12 | 19.12      | 0.0  | 0.0         |
+      | 7  | 30   | 11 October 2025   | 11 March 2025     |  95.6           | 19.12         | 0.0      | 0.0  | 0.0       | 19.12 | 19.12 | 19.12      | 0.0  | 0.0         |
+      | 8  | 31   | 11 November 2025  | 11 March 2025     |  76.48          | 19.12         | 0.0      | 0.0  | 0.0       | 19.12 | 19.12 | 19.12      | 0.0  | 0.0         |
+      | 9  | 30   | 11 December 2025  | 11 March 2025     |  57.36          | 19.12         | 0.0      | 0.0  | 0.0       | 19.12 | 19.12 | 19.12      | 0.0  | 0.0         |
+      | 10 | 31   | 11 January 2026   | 11 March 2025     |  38.24          | 19.12         | 0.0      | 0.0  | 0.0       | 19.12 | 19.12 | 19.12      | 0.0  | 0.0         |
+      | 11 | 31   | 11 February 2026  | 11 March 2025     |  19.12          | 19.12         | 0.0      | 0.0  | 0.0       | 19.12 | 19.12 | 19.12      | 0.0  | 0.0         |
+      | 12 | 28   | 11 March 2026     | 11 March 2025     |    0.0          | 19.12         | 0.0      | 0.0  | 0.0       | 19.12 | 19.12 | 19.12      | 0.0  | 0.0         |
+    Then Loan Repayment schedule has the following data in Total row:
+      | Principal due | Interest | Fees | Penalties | Due   | Paid  | In advance | Late | Outstanding |
+      | 200.0         | 0        | 0.0  | 0         | 200.0 | 200.0 | 200.0      | 0.0  | 0.0         |
+    Then Loan Transactions tab has the following data:
+      | Transaction date  | Transaction Type          | Amount | Principal | Interest | Fees | Penalties | Loan Balance |
+      | 11 March 2025     | Disbursement              | 200.0  | 0.0       | 0.0      | 0.0  | 0.0       | 200.0        |
+      | 11 March 2025     | Merchant Issued Refund    | 200.0  | 200.0     | 0.0      | 0.0  | 0.0       | 0.0          |
+    And Admin successfully disburse the loan on "11 March 2025" with "200" EUR transaction amount
+    Then Loan Repayment schedule has 12 periods, with the following data for periods:
+      | Nr | Days | Date              | Paid date         | Balance of loan | Principal due | Interest | Fees | Penalties | Due   | Paid  | In advance | Late | Outstanding |
+      |    |      | 11 March 2025     |                   | 200.0           |               |          | 0.0  |           | 0.0   | 0.0   |            |      |             |
+      |    |      | 11 March 2025     |                   | 200.0           |               |          | 0.0  |           | 0.0   | 0.0   |            |      |             |
+      | 1  | 31   | 11 April 2025     |                   | 366.18          | 33.82         | 4.42     | 0.0  | 0.0       | 38.24 | 0.0   | 0.0        | 0.0  | 38.24       |
+      | 2  | 30   | 11 May 2025       |                   | 331.49          | 34.69         | 3.55     | 0.0  | 0.0       | 38.24 | 8.8   | 8.8        | 0.0  | 29.44       |
+      | 3  | 31   | 11 June 2025      |                   | 296.35          | 35.14         | 3.1      | 0.0  | 0.0       | 38.24 | 19.12 | 19.12      | 0.0  | 19.12       |
+      | 4  | 30   | 11 July 2025      |                   | 260.77          | 35.58         | 2.66     | 0.0  | 0.0       | 38.24 | 19.12 | 19.12      | 0.0  | 19.12       |
+      | 5  | 31   | 11 August 2025    |                   | 224.91          | 35.86         | 2.38     | 0.0  | 0.0       | 38.24 | 19.12 | 19.12      | 0.0  | 19.12       |
+      | 6  | 31   | 11 September 2025 |                   | 188.68          | 36.23         | 2.01     | 0.0  | 0.0       | 38.24 | 19.12 | 19.12      | 0.0  | 19.12       |
+      | 7  | 30   | 11 October 2025   |                   | 152.02          | 36.66         | 1.58     | 0.0  | 0.0       | 38.24 | 19.12 | 19.12      | 0.0  | 19.12       |
+      | 8  | 31   | 11 November 2025  |                   | 115.03          | 36.99         | 1.25     | 0.0  | 0.0       | 38.24 | 19.12 | 19.12      | 0.0  | 19.12       |
+      | 9  | 30   | 11 December 2025  |                   |  77.61          | 37.42         | 0.82     | 0.0  | 0.0       | 38.24 | 19.12 | 19.12      | 0.0  | 19.12       |
+      | 10 | 31   | 11 January 2026   |                   |  39.82          | 37.79         | 0.45     | 0.0  | 0.0       | 38.24 | 19.12 | 19.12      | 0.0  | 19.12       |
+      | 11 | 31   | 11 February 2026  |                   |  19.12          | 20.7          | 0.03     | 0.0  | 0.0       | 20.73 | 19.12 | 19.12      | 0.0  | 1.61        |
+      | 12 | 28   | 11 March 2026     | 11 March 2025     |    0.0          | 19.12         | 0.0      | 0.0  | 0.0       | 19.12 | 19.12 | 19.12      | 0.0  | 0.0         |
+    Then Loan Repayment schedule has the following data in Total row:
+      | Principal due | Interest | Fees | Penalties | Due    | Paid  | In advance | Late | Outstanding |
+      | 400.0         | 22.25    | 0.0  | 0         | 422.25 | 200.0 | 200.0      | 0.0  | 222.25      |
+    Then Loan Transactions tab has the following data:
+      | Transaction date  | Transaction Type          | Amount | Principal | Interest | Fees | Penalties | Loan Balance |
+      | 11 March 2025     | Disbursement              | 200.0  | 0.0       | 0.0      | 0.0  | 0.0       | 200.0        |
+      | 11 March 2025     | Merchant Issued Refund    | 200.0  | 200.0     | 0.0      | 0.0  | 0.0       | 0.0          |
+      | 11 March 2025     | Disbursement              | 200.0  | 0.0       | 0.0      | 0.0  | 0.0       | 200.0        |
+    When Admin set "LP2_DOWNPAYMENT_AUTO_ADVANCED_PAYMENT_ALLOCATION" loan product "MERCHANT_ISSUED_REFUND" transaction type to "NEXT_INSTALLMENT" future installment allocation rule

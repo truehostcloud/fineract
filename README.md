@@ -452,7 +452,7 @@ Apache Fineract / Mifos X Demo (November 2016) - <https://www.youtube.com/watch?
 We use Swagger-UI to generate and maintain our API documentation, you can see the demo video [here](https://www.youtube.com/watch?v=FlVd-0YAo6c) or a live version
 [here](https://sandbox.mifos.community/fineract-provider/swagger-ui/index.html). If you interested to know more about Swagger-UI you can check their [website](https://swagger.io/).
 
-<br>GORVENANCE AND POLICIES
+<br>GOVERNANCE AND POLICIES
 =======================
 
 [Becoming a Committer](https://cwiki.apache.org/confluence/display/FINERACT/Becoming+a+Committer)

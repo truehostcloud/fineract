@@ -29,16 +29,16 @@ import io.restassured.http.ContentType;
 import io.restassured.specification.RequestSpecification;
 import io.restassured.specification.ResponseSpecification;
 import java.math.BigDecimal;
-import java.time.format.DateTimeFormatter;
 import java.util.List;
-import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.fineract.client.models.AdvancedPaymentData;
 import org.apache.fineract.client.models.GetLoansLoanIdResponse;
 import org.apache.fineract.client.models.GetLoansLoanIdTransactions;
 import org.apache.fineract.client.models.GetLoansLoanIdTransactionsTransactionIdResponse;
+import org.apache.fineract.client.models.PaymentAllocationOrder;
 import org.apache.fineract.client.models.PostClientsResponse;
 import org.apache.fineract.client.models.PostLoanProductsResponse;
 import org.apache.fineract.client.models.PostLoansLoanIdTransactionsResponse;
@@ -48,6 +48,8 @@ import org.apache.fineract.integrationtests.common.BusinessStepHelper;
 import org.apache.fineract.integrationtests.common.ClientHelper;
 import org.apache.fineract.integrationtests.common.Utils;
 import org.apache.fineract.integrationtests.common.loans.LoanTransactionHelper;
+import org.apache.fineract.portfolio.loanaccount.domain.LoanStatus;
+import org.apache.fineract.portfolio.loanproduct.domain.PaymentAllocationType;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -90,12 +92,11 @@ public class LoanInterestRefundTest extends BaseLoanIntegrationTest {
         });
         runAt("22 January 2021", () -> {
             Long loanId = loanIdRef.get();
-            PostLoansLoanIdTransactionsResponse postLoansLoanIdTransactionsResponse = loanTransactionHelper
-                    .makeLoanRepayment("PayoutRefund", "22 January 2021", 1000F, loanId.intValue());
+            PostLoansLoanIdTransactionsResponse postLoansLoanIdTransactionsResponse = loanTransactionHelper.makeLoanRepayment(loanId,
+                    "PayoutRefund", "22 January 2021", 1000.0);
             Assertions.assertNotNull(postLoansLoanIdTransactionsResponse);
             Assertions.assertNotNull(postLoansLoanIdTransactionsResponse.getResourceId());
 
-            logLoanTransactions(loanId);
             verifyTransactions(loanId, transaction(1000.0, "Disbursement", "01 January 2021"),
                     transaction(1000.0, "Payout Refund", "22 January 2021"));
         });
@@ -118,12 +119,11 @@ public class LoanInterestRefundTest extends BaseLoanIntegrationTest {
         });
         runAt("22 January 2021", () -> {
             Long loanId = loanIdRef.get();
-            PostLoansLoanIdTransactionsResponse postLoansLoanIdTransactionsResponse = loanTransactionHelper
-                    .makeLoanRepayment("MerchantIssuedRefund", "22 January 2021", 1000F, loanId.intValue());
+            PostLoansLoanIdTransactionsResponse postLoansLoanIdTransactionsResponse = loanTransactionHelper.makeLoanRepayment(loanId,
+                    "MerchantIssuedRefund", "22 January 2021", 1000.0);
             Assertions.assertNotNull(postLoansLoanIdTransactionsResponse);
             Assertions.assertNotNull(postLoansLoanIdTransactionsResponse.getResourceId());
 
-            logLoanTransactions(loanId);
             verifyTransactions(loanId, transaction(1000.0, "Disbursement", "01 January 2021"),
                     transaction(1000.0, "Merchant Issued Refund", "22 January 2021"));
         });
@@ -143,8 +143,8 @@ public class LoanInterestRefundTest extends BaseLoanIntegrationTest {
                     6, null);
             Assertions.assertNotNull(loanId);
             disburseLoan(loanId, BigDecimal.valueOf(600), "1 January 2021");
-            PostLoansLoanIdTransactionsResponse postLoansLoanIdTransactionsResponse = loanTransactionHelper
-                    .makeLoanRepayment("MerchantIssuedRefund", "1 January 2021", 600F, loanId.intValue());
+            PostLoansLoanIdTransactionsResponse postLoansLoanIdTransactionsResponse = loanTransactionHelper.makeLoanRepayment(loanId,
+                    "MerchantIssuedRefund", "1 January 2021", 600.0);
             Assertions.assertNotNull(postLoansLoanIdTransactionsResponse);
             Assertions.assertNotNull(postLoansLoanIdTransactionsResponse.getResourceId());
 
@@ -177,8 +177,8 @@ public class LoanInterestRefundTest extends BaseLoanIntegrationTest {
             Assertions.assertNotNull(loanId);
             disburseLoan(loanId, BigDecimal.valueOf(1000), "1 January 2021");
 
-            PostLoansLoanIdTransactionsResponse postLoansLoanIdTransactionsResponse = loanTransactionHelper
-                    .makeLoanRepayment("MerchantIssuedRefund", "1 January 2021", 980F, loanId.intValue());
+            PostLoansLoanIdTransactionsResponse postLoansLoanIdTransactionsResponse = loanTransactionHelper.makeLoanRepayment(loanId,
+                    "MerchantIssuedRefund", "1 January 2021", 980.0);
             Assertions.assertNotNull(postLoansLoanIdTransactionsResponse);
             Assertions.assertNotNull(postLoansLoanIdTransactionsResponse.getResourceId());
 
@@ -218,8 +218,8 @@ public class LoanInterestRefundTest extends BaseLoanIntegrationTest {
             Assertions.assertNotNull(loanId);
             disburseLoan(loanId, BigDecimal.valueOf(1000), "1 January 2021");
 
-            PostLoansLoanIdTransactionsResponse postLoansLoanIdTransactionsResponse = loanTransactionHelper
-                    .makeLoanRepayment("MerchantIssuedRefund", "1 January 2021", 1000F, loanId.intValue());
+            PostLoansLoanIdTransactionsResponse postLoansLoanIdTransactionsResponse = loanTransactionHelper.makeLoanRepayment(loanId,
+                    "MerchantIssuedRefund", "1 January 2021", 1000.0);
             Assertions.assertNotNull(postLoansLoanIdTransactionsResponse);
             Assertions.assertNotNull(postLoansLoanIdTransactionsResponse.getResourceId());
 
@@ -261,12 +261,11 @@ public class LoanInterestRefundTest extends BaseLoanIntegrationTest {
         });
         runAt("22 January 2021", () -> {
             Long loanId = loanIdRef.get();
-            PostLoansLoanIdTransactionsResponse postLoansLoanIdTransactionsResponse = loanTransactionHelper
-                    .makeLoanRepayment("PayoutRefund", "22 January 2021", 1000F, loanId.intValue());
+            PostLoansLoanIdTransactionsResponse postLoansLoanIdTransactionsResponse = loanTransactionHelper.makeLoanRepayment(loanId,
+                    "PayoutRefund", "22 January 2021", 1000.0);
             Assertions.assertNotNull(postLoansLoanIdTransactionsResponse);
             Assertions.assertNotNull(postLoansLoanIdTransactionsResponse.getResourceId());
 
-            logLoanTransactions(loanId);
             verifyTransactions(loanId, //
                     transaction(1000.0, "Disbursement", "01 January 2021"), //
                     transaction(1000.0, "Payout Refund", "22 January 2021"), //
@@ -319,12 +318,11 @@ public class LoanInterestRefundTest extends BaseLoanIntegrationTest {
         });
         runAt("22 January 2021", () -> {
             Long loanId = loanIdRef.get();
-            PostLoansLoanIdTransactionsResponse postLoansLoanIdTransactionsResponse = loanTransactionHelper
-                    .makeLoanRepayment("MerchantIssuedRefund", "22 January 2021", 1000F, loanId.intValue());
+            PostLoansLoanIdTransactionsResponse postLoansLoanIdTransactionsResponse = loanTransactionHelper.makeLoanRepayment(loanId,
+                    "MerchantIssuedRefund", "22 January 2021", 1000.0);
             Assertions.assertNotNull(postLoansLoanIdTransactionsResponse);
             Assertions.assertNotNull(postLoansLoanIdTransactionsResponse.getResourceId());
 
-            logLoanTransactions(loanId);
             verifyTransactions(loanId, transaction(1000.0, "Disbursement", "01 January 2021"), //
                     transaction(1000.0, "Merchant Issued Refund", "22 January 2021"), //
                     transaction(5.75, "Accrual", "22 January 2021"), //
@@ -351,8 +349,8 @@ public class LoanInterestRefundTest extends BaseLoanIntegrationTest {
         });
         runAt("22 January 2021", () -> {
             Long loanId = loanIdRef.get();
-            PostLoansLoanIdTransactionsResponse postLoansLoanIdTransactionsResponse = loanTransactionHelper
-                    .makeLoanRepayment("MerchantIssuedRefund", "22 January 2021", 1000F, loanId.intValue());
+            PostLoansLoanIdTransactionsResponse postLoansLoanIdTransactionsResponse = loanTransactionHelper.makeLoanRepayment(loanId,
+                    "MerchantIssuedRefund", "22 January 2021", 1000.0);
             Assertions.assertNotNull(postLoansLoanIdTransactionsResponse);
             Assertions.assertNotNull(postLoansLoanIdTransactionsResponse.getResourceId());
 
@@ -391,8 +389,8 @@ public class LoanInterestRefundTest extends BaseLoanIntegrationTest {
                     12, null);
             Assertions.assertNotNull(loanId);
             disburseLoan(loanId, BigDecimal.valueOf(1000), "1 January 2021");
-            PostLoansLoanIdTransactionsResponse postLoansLoanIdTransactionsResponse = loanTransactionHelper
-                    .makeLoanRepayment("MerchantIssuedRefund", "1 January 2021", 1000F, loanId.intValue());
+            PostLoansLoanIdTransactionsResponse postLoansLoanIdTransactionsResponse = loanTransactionHelper.makeLoanRepayment(loanId,
+                    "MerchantIssuedRefund", "1 January 2021", 1000.0);
             Assertions.assertNotNull(postLoansLoanIdTransactionsResponse);
             Assertions.assertNotNull(postLoansLoanIdTransactionsResponse.getResourceId());
 
@@ -429,8 +427,8 @@ public class LoanInterestRefundTest extends BaseLoanIntegrationTest {
                     12, null);
             Assertions.assertNotNull(loanId);
             disburseLoan(loanId, BigDecimal.valueOf(1000), "1 January 2021");
-            PostLoansLoanIdTransactionsResponse postLoansLoanIdTransactionsResponse = loanTransactionHelper.makeLoanRepayment("Repayment",
-                    "1 January 2021", 1000F, loanId.intValue());
+            PostLoansLoanIdTransactionsResponse postLoansLoanIdTransactionsResponse = loanTransactionHelper.makeLoanRepayment(loanId,
+                    "Repayment", "1 January 2021", 1000.0);
             Assertions.assertNotNull(postLoansLoanIdTransactionsResponse);
             Assertions.assertNotNull(postLoansLoanIdTransactionsResponse.getResourceId());
 
@@ -473,12 +471,11 @@ public class LoanInterestRefundTest extends BaseLoanIntegrationTest {
         });
         runAt("22 January 2021", () -> {
             Long loanId = loanIdRef.get();
-            PostLoansLoanIdTransactionsResponse postLoansLoanIdTransactionsResponse = loanTransactionHelper
-                    .makeLoanRepayment("PayoutRefund", "22 January 2021", 1000F, loanId.intValue());
+            PostLoansLoanIdTransactionsResponse postLoansLoanIdTransactionsResponse = loanTransactionHelper.makeLoanRepayment(loanId,
+                    "PayoutRefund", "22 January 2021", 1000.0);
             Assertions.assertNotNull(postLoansLoanIdTransactionsResponse);
             Assertions.assertNotNull(postLoansLoanIdTransactionsResponse.getResourceId());
 
-            logLoanTransactions(loanId);
             verifyTransactions(loanId, transaction(1000.0, "Disbursement", "01 January 2021"), //
                     transaction(1000.0, "Payout Refund", "22 January 2021"), //
                     transaction(5.75, "Accrual", "22 January 2021"), //
@@ -506,12 +503,11 @@ public class LoanInterestRefundTest extends BaseLoanIntegrationTest {
         });
         runAt("1 February 2021", () -> {
             Long loanId = loanIdRef.get();
-            PostLoansLoanIdTransactionsResponse postLoansLoanIdTransactionsResponse = loanTransactionHelper
-                    .makeLoanRepayment("PayoutRefund", "1 February 2021", 1000F, loanId.intValue());
+            PostLoansLoanIdTransactionsResponse postLoansLoanIdTransactionsResponse = loanTransactionHelper.makeLoanRepayment(loanId,
+                    "PayoutRefund", "1 February 2021", 1000.0);
             Assertions.assertNotNull(postLoansLoanIdTransactionsResponse);
             Assertions.assertNotNull(postLoansLoanIdTransactionsResponse.getResourceId());
 
-            logLoanTransactions(loanId);
             verifyTransactions(loanId, transaction(1000.0, "Disbursement", "01 January 2021"), //
                     transaction(1000.0, "Payout Refund", "01 February 2021"), //
                     transaction(8.48, "Accrual", "01 February 2021"), //
@@ -538,24 +534,22 @@ public class LoanInterestRefundTest extends BaseLoanIntegrationTest {
         });
         runAt("1 February 2021", () -> {
             Long loanId = loanIdRef.get();
-            PostLoansLoanIdTransactionsResponse postLoansLoanIdTransactionsResponse = loanTransactionHelper.makeLoanRepayment("Repayment",
-                    "1 February 2021", 87.89F, loanId.intValue());
+            PostLoansLoanIdTransactionsResponse postLoansLoanIdTransactionsResponse = loanTransactionHelper.makeLoanRepayment(loanId,
+                    "Repayment", "1 February 2021", 87.89);
             Assertions.assertNotNull(postLoansLoanIdTransactionsResponse);
             Assertions.assertNotNull(postLoansLoanIdTransactionsResponse.getResourceId());
 
-            logLoanTransactions(loanId);
             verifyTransactions(loanId, transaction(1000.0, "Disbursement", "01 January 2021"),
                     transaction(87.89, "Repayment", "01 February 2021"));
         });
 
         runAt("9 February 2021", () -> {
             Long loanId = loanIdRef.get();
-            PostLoansLoanIdTransactionsResponse postLoansLoanIdTransactionsResponse = loanTransactionHelper
-                    .makeLoanRepayment("PayoutRefund", "9 February 2021", 1000F, loanId.intValue());
+            PostLoansLoanIdTransactionsResponse postLoansLoanIdTransactionsResponse = loanTransactionHelper.makeLoanRepayment(loanId,
+                    "PayoutRefund", "9 February 2021", 1000.0);
             Assertions.assertNotNull(postLoansLoanIdTransactionsResponse);
             Assertions.assertNotNull(postLoansLoanIdTransactionsResponse.getResourceId());
 
-            logLoanTransactions(loanId);
             verifyTransactions(loanId, transaction(1000.0, "Disbursement", "01 January 2021"), //
                     transaction(87.89, "Repayment", "01 February 2021"), //
                     transaction(1000.0, "Payout Refund", "09 February 2021"), //
@@ -588,12 +582,11 @@ public class LoanInterestRefundTest extends BaseLoanIntegrationTest {
         });
         runAt("22 January 2021", () -> {
             Long loanId = loanIdRef.get();
-            PostLoansLoanIdTransactionsResponse postLoansLoanIdTransactionsResponse = loanTransactionHelper
-                    .makeLoanRepayment("PayoutRefund", "22 January 2021", 1000F, loanId.intValue());
+            PostLoansLoanIdTransactionsResponse postLoansLoanIdTransactionsResponse = loanTransactionHelper.makeLoanRepayment(loanId,
+                    "PayoutRefund", "22 January 2021", 1000.0);
             Assertions.assertNotNull(postLoansLoanIdTransactionsResponse);
             Assertions.assertNotNull(postLoansLoanIdTransactionsResponse.getResourceId());
 
-            logLoanTransactions(loanId);
             verifyTransactions(loanId, transaction(750.0, "Disbursement", "01 January 2021"), //
                     transaction(250.0, "Disbursement", "01 January 2021"), //
                     transaction(1000.0, "Payout Refund", "22 January 2021"), //
@@ -627,12 +620,11 @@ public class LoanInterestRefundTest extends BaseLoanIntegrationTest {
         });
         runAt("22 January 2021", () -> {
             Long loanId = loanIdRef.get();
-            PostLoansLoanIdTransactionsResponse postLoansLoanIdTransactionsResponse = loanTransactionHelper
-                    .makeLoanRepayment("PayoutRefund", "22 January 2021", 1000F, loanId.intValue());
+            PostLoansLoanIdTransactionsResponse postLoansLoanIdTransactionsResponse = loanTransactionHelper.makeLoanRepayment(loanId,
+                    "PayoutRefund", "22 January 2021", 1000.0);
             Assertions.assertNotNull(postLoansLoanIdTransactionsResponse);
             Assertions.assertNotNull(postLoansLoanIdTransactionsResponse.getResourceId());
 
-            logLoanTransactions(loanId);
             verifyTransactions(loanId, transaction(750.0, "Disbursement", "04 January 2021"), //
                     transaction(250.0, "Disbursement", "01 January 2021"), //
                     transaction(1000.0, "Payout Refund", "22 January 2021"), //
@@ -667,24 +659,22 @@ public class LoanInterestRefundTest extends BaseLoanIntegrationTest {
         });
         runAt("1 February 2021", () -> {
             Long loanId = loanIdRef.get();
-            PostLoansLoanIdTransactionsResponse postLoansLoanIdTransactionsResponse = loanTransactionHelper.makeLoanRepayment("Repayment",
-                    "1 February 2021", 87.82F, loanId.intValue());
+            PostLoansLoanIdTransactionsResponse postLoansLoanIdTransactionsResponse = loanTransactionHelper.makeLoanRepayment(loanId,
+                    "Repayment", "1 February 2021", 87.82);
             Assertions.assertNotNull(postLoansLoanIdTransactionsResponse);
             Assertions.assertNotNull(postLoansLoanIdTransactionsResponse.getResourceId());
 
-            logLoanTransactions(loanId);
             verifyTransactions(loanId, transaction(500.0, "Disbursement", "01 January 2021"),
                     transaction(500.0, "Disbursement", "07 January 2021"), transaction(87.82, "Repayment", "01 February 2021"));
         });
 
         runAt("9 February 2021", () -> {
             Long loanId = loanIdRef.get();
-            PostLoansLoanIdTransactionsResponse postLoansLoanIdTransactionsResponse = loanTransactionHelper
-                    .makeLoanRepayment("PayoutRefund", "9 February 2021", 1000F, loanId.intValue());
+            PostLoansLoanIdTransactionsResponse postLoansLoanIdTransactionsResponse = loanTransactionHelper.makeLoanRepayment(loanId,
+                    "PayoutRefund", "9 February 2021", 1000.0);
             Assertions.assertNotNull(postLoansLoanIdTransactionsResponse);
             Assertions.assertNotNull(postLoansLoanIdTransactionsResponse.getResourceId());
 
-            logLoanTransactions(loanId);
             verifyTransactions(loanId, transaction(500.0, "Disbursement", "01 January 2021"), //
                     transaction(500.0, "Disbursement", "07 January 2021"), //
                     transaction(1000.0, "Payout Refund", "09 February 2021"), //
@@ -715,12 +705,11 @@ public class LoanInterestRefundTest extends BaseLoanIntegrationTest {
         });
         runAt("14 December 2020", () -> {
             Long loanId = loanIdRef.get();
-            PostLoansLoanIdTransactionsResponse postLoansLoanIdTransactionsResponse = loanTransactionHelper
-                    .makeLoanRepayment("PayoutRefund", "14 December 2020", 500F, loanId.intValue());
+            PostLoansLoanIdTransactionsResponse postLoansLoanIdTransactionsResponse = loanTransactionHelper.makeLoanRepayment(loanId,
+                    "PayoutRefund", "14 December 2020", 500.0);
             Assertions.assertNotNull(postLoansLoanIdTransactionsResponse);
             Assertions.assertNotNull(postLoansLoanIdTransactionsResponse.getResourceId());
 
-            logLoanTransactions(loanId);
             verifyTransactions(loanId, transaction(1000.0, "Disbursement", "01 December 2020"), //
                     transaction(500.0, "Payout Refund", "14 December 2020"), //
                     transaction(1.78, "Interest Refund", "14 December 2020"));
@@ -743,29 +732,24 @@ public class LoanInterestRefundTest extends BaseLoanIntegrationTest {
             Assertions.assertNotNull(loanId);
             loanIdRef.set(loanId);
             disburseLoan(loanId, BigDecimal.valueOf(1000), "1 January 2021");
-
-            GetLoansLoanIdResponse loanDetails = loanTransactionHelper.getLoanDetails(loanId);
-            logInstallmentsOfLoanDetails(loanDetails);
         });
         runAt("1 February 2021", () -> {
             Long loanId = loanIdRef.get();
-            PostLoansLoanIdTransactionsResponse postLoansLoanIdTransactionsResponse = loanTransactionHelper.makeLoanRepayment("Repayment",
-                    "1 February 2021", 87.89F, loanId.intValue());
+            PostLoansLoanIdTransactionsResponse postLoansLoanIdTransactionsResponse = loanTransactionHelper.makeLoanRepayment(loanId,
+                    "Repayment", "1 February 2021", 87.89);
             Assertions.assertNotNull(postLoansLoanIdTransactionsResponse);
             Assertions.assertNotNull(postLoansLoanIdTransactionsResponse.getResourceId());
 
-            logLoanTransactions(loanId);
             verifyTransactions(loanId, transaction(1000.0, "Disbursement", "01 January 2021"), //
                     transaction(87.89, "Repayment", "01 February 2021"));
         });
         runAt("9 February 2021", () -> {
             Long loanId = loanIdRef.get();
-            PostLoansLoanIdTransactionsResponse postLoansLoanIdTransactionsResponse = loanTransactionHelper
-                    .makeLoanRepayment("PayoutRefund", "09 February 2021", 500F, loanId.intValue());
+            PostLoansLoanIdTransactionsResponse postLoansLoanIdTransactionsResponse = loanTransactionHelper.makeLoanRepayment(loanId,
+                    "PayoutRefund", "09 February 2021", 500.0);
             Assertions.assertNotNull(postLoansLoanIdTransactionsResponse);
             Assertions.assertNotNull(postLoansLoanIdTransactionsResponse.getResourceId());
 
-            logLoanTransactions(loanId);
             verifyTransactions(loanId, transaction(1000.0, "Disbursement", "01 January 2021"), //
                     transaction(87.89, "Repayment", "01 February 2021"), //
                     transaction(500.0, "Payout Refund", "09 February 2021"), //
@@ -795,12 +779,11 @@ public class LoanInterestRefundTest extends BaseLoanIntegrationTest {
         });
         runAt("22 January 2021", () -> {
             Long loanId = loanIdRef.get();
-            PostLoansLoanIdTransactionsResponse postLoansLoanIdTransactionsResponse = loanTransactionHelper
-                    .makeLoanRepayment("PayoutRefund", "22 January 2021", 500F, loanId.intValue());
+            PostLoansLoanIdTransactionsResponse postLoansLoanIdTransactionsResponse = loanTransactionHelper.makeLoanRepayment(loanId,
+                    "PayoutRefund", "22 January 2021", 500.0);
             Assertions.assertNotNull(postLoansLoanIdTransactionsResponse);
             Assertions.assertNotNull(postLoansLoanIdTransactionsResponse.getResourceId());
 
-            logLoanTransactions(loanId);
             verifyTransactions(loanId, transaction(250.0, "Disbursement", "01 January 2021"), //
                     transaction(750.0, "Disbursement", "01 January 2021"), //
                     transaction(500.0, "Payout Refund", "22 January 2021"), //
@@ -832,12 +815,11 @@ public class LoanInterestRefundTest extends BaseLoanIntegrationTest {
         });
         runAt("22 January 2021", () -> {
             Long loanId = loanIdRef.get();
-            PostLoansLoanIdTransactionsResponse postLoansLoanIdTransactionsResponse = loanTransactionHelper
-                    .makeLoanRepayment("PayoutRefund", "22 January 2021", 500F, loanId.intValue());
+            PostLoansLoanIdTransactionsResponse postLoansLoanIdTransactionsResponse = loanTransactionHelper.makeLoanRepayment(loanId,
+                    "PayoutRefund", "22 January 2021", 500.0);
             Assertions.assertNotNull(postLoansLoanIdTransactionsResponse);
             Assertions.assertNotNull(postLoansLoanIdTransactionsResponse.getResourceId());
 
-            logLoanTransactions(loanId);
             verifyTransactions(loanId, transaction(250.0, "Disbursement", "01 January 2021"), //
                     transaction(750.0, "Disbursement", "07 January 2021"), //
                     transaction(500.0, "Payout Refund", "22 January 2021"), //
@@ -867,20 +849,16 @@ public class LoanInterestRefundTest extends BaseLoanIntegrationTest {
         runAt("7 January 2021", () -> {
             Long loanId = loanIdRef.get();
             disburseLoan(loanId, BigDecimal.valueOf(750), "7 January 2021");
-
-            GetLoansLoanIdResponse loanDetails = loanTransactionHelper.getLoanDetails(loanId);
-            logInstallmentsOfLoanDetails(loanDetails);
         });
         runAt("1 July 2021", () -> {
             Long loanId = loanIdRef.get();
-            loanTransactionHelper.makeLoanRepayment("Repayment", "1 February 2021", 171.29F, loanId.intValue());
-            loanTransactionHelper.makeLoanRepayment("Repayment", "1 March 2021", 171.29F, loanId.intValue());
-            loanTransactionHelper.makeLoanRepayment("Repayment", "1 April 2021", 171.29F, loanId.intValue());
-            loanTransactionHelper.makeLoanRepayment("Repayment", "1 May 2021", 171.29F, loanId.intValue());
-            loanTransactionHelper.makeLoanRepayment("Repayment", "1 June 2021", 171.29F, loanId.intValue());
-            loanTransactionHelper.makeLoanRepayment("Repayment", "1 July 2021", 171.32F, loanId.intValue());
+            loanTransactionHelper.makeLoanRepayment(loanId, "Repayment", "1 February 2021", 171.29);
+            loanTransactionHelper.makeLoanRepayment(loanId, "Repayment", "1 March 2021", 171.29);
+            loanTransactionHelper.makeLoanRepayment(loanId, "Repayment", "1 April 2021", 171.29);
+            loanTransactionHelper.makeLoanRepayment(loanId, "Repayment", "1 May 2021", 171.29);
+            loanTransactionHelper.makeLoanRepayment(loanId, "Repayment", "1 June 2021", 171.29);
+            loanTransactionHelper.makeLoanRepayment(loanId, "Repayment", "1 July 2021", 171.32);
 
-            logLoanTransactions(loanId);
             verifyTransactions(loanId, transaction(250.0, "Disbursement", "01 January 2021"), //
                     transaction(750.0, "Disbursement", "07 January 2021"), //
                     transaction(171.29, "Repayment", "01 February 2021"), //
@@ -894,12 +872,11 @@ public class LoanInterestRefundTest extends BaseLoanIntegrationTest {
         });
         runAt("11 July 2021", () -> {
             Long loanId = loanIdRef.get();
-            PostLoansLoanIdTransactionsResponse postLoansLoanIdTransactionsResponse = loanTransactionHelper
-                    .makeLoanRepayment("PayoutRefund", "11 July 2021", 500.0F, loanId.intValue());
+            PostLoansLoanIdTransactionsResponse postLoansLoanIdTransactionsResponse = loanTransactionHelper.makeLoanRepayment(loanId,
+                    "PayoutRefund", "11 July 2021", 500.0);
             Assertions.assertNotNull(postLoansLoanIdTransactionsResponse);
             Assertions.assertNotNull(postLoansLoanIdTransactionsResponse.getResourceId());
 
-            logLoanTransactions(loanId);
             verifyTransactions(loanId, transaction(250.0, "Disbursement", "01 January 2021"), //
                     transaction(750.0, "Disbursement", "07 January 2021"), //
                     transaction(171.29, "Repayment", "01 February 2021"), //
@@ -935,7 +912,7 @@ public class LoanInterestRefundTest extends BaseLoanIntegrationTest {
         });
         runAt("14 January 2021", () -> {
             Long loanId = loanIdRef.get();
-            loanTransactionHelper.makeLoanRepayment("MerchantIssuedRefund", "14 January 2021", 500F, loanId.intValue());
+            loanTransactionHelper.makeLoanRepayment(loanId, "MerchantIssuedRefund", "14 January 2021", 500.0);
 
             verifyTransactions(loanId, transaction(1000.0, "Disbursement", "01 January 2021"), //
                     transaction(500.0, "Merchant Issued Refund", "14 January 2021"), //
@@ -943,8 +920,7 @@ public class LoanInterestRefundTest extends BaseLoanIntegrationTest {
         });
         runAt("22 January 2021", () -> {
             Long loanId = loanIdRef.get();
-            loanTransactionHelper.makeLoanRepayment("PayoutRefund", "22 January 2021", 500F, loanId.intValue());
-            logLoanTransactions(loanId);
+            loanTransactionHelper.makeLoanRepayment(loanId, "PayoutRefund", "22 January 2021", 500.0);
             verifyTransactions(loanId, transaction(1000.0, "Disbursement", "01 January 2021"), //
                     transaction(500.0, "Merchant Issued Refund", "14 January 2021"), //
                     transaction(1.78, "Interest Refund", "14 January 2021"), //
@@ -975,14 +951,14 @@ public class LoanInterestRefundTest extends BaseLoanIntegrationTest {
         });
         runAt("1 February 2021", () -> {
             Long loanId = loanIdRef.get();
-            loanTransactionHelper.makeLoanRepayment("Repayment", "1 February 2021", 171.50F, loanId.intValue());
+            loanTransactionHelper.makeLoanRepayment(loanId, "Repayment", "1 February 2021", 171.50);
 
             verifyTransactions(loanId, transaction(1000.0, "Disbursement", "01 January 2021"), //
                     transaction(171.5, "Repayment", "01 February 2021"));
         });
         runAt("9 February 2021", () -> {
             Long loanId = loanIdRef.get();
-            loanTransactionHelper.makeLoanRepayment("MerchantIssuedRefund", "9 February 2021", 500F, loanId.intValue());
+            loanTransactionHelper.makeLoanRepayment(loanId, "MerchantIssuedRefund", "9 February 2021", 500.0);
 
             verifyTransactions(loanId, transaction(1000.0, "Disbursement", "01 January 2021"), //
                     transaction(171.5, "Repayment", "01 February 2021"), //
@@ -991,7 +967,7 @@ public class LoanInterestRefundTest extends BaseLoanIntegrationTest {
         });
         runAt("25 February 2021", () -> {
             Long loanId = loanIdRef.get();
-            loanTransactionHelper.makeLoanRepayment("PayoutRefund", "25 February 2021", 250F, loanId.intValue());
+            loanTransactionHelper.makeLoanRepayment(loanId, "PayoutRefund", "25 February 2021", 250.0);
 
             verifyTransactions(loanId, transaction(1000.0, "Disbursement", "01 January 2021"), //
                     transaction(171.5, "Repayment", "01 February 2021"), //
@@ -1026,7 +1002,7 @@ public class LoanInterestRefundTest extends BaseLoanIntegrationTest {
         });
         runAt("22 January 2021", () -> {
             Long loanId = loanIdRef.get();
-            loanTransactionHelper.makeLoanRepayment("MerchantIssuedRefund", "22 January 2021", 500F, loanId.intValue());
+            loanTransactionHelper.makeLoanRepayment(loanId, "MerchantIssuedRefund", "22 January 2021", 500.0);
 
             verifyTransactions(loanId, transaction(250.0, "Disbursement", "01 January 2021"), //
                     transaction(750.0, "Disbursement", "01 January 2021"), //
@@ -1036,7 +1012,7 @@ public class LoanInterestRefundTest extends BaseLoanIntegrationTest {
         });
         runAt("26 January 2021", () -> {
             Long loanId = loanIdRef.get();
-            loanTransactionHelper.makeLoanRepayment("PayoutRefund", "26 January 2021", 400F, loanId.intValue());
+            loanTransactionHelper.makeLoanRepayment(loanId, "PayoutRefund", "26 January 2021", 400.0);
 
             verifyTransactions(loanId, transaction(250.0, "Disbursement", "01 January 2021"), //
                     transaction(750.0, "Disbursement", "01 January 2021"), //
@@ -1048,7 +1024,7 @@ public class LoanInterestRefundTest extends BaseLoanIntegrationTest {
         });
         runAt("1 February 2021", () -> {
             Long loanId = loanIdRef.get();
-            loanTransactionHelper.makeLoanRepayment("Repayment", "1 February 2021", 100.84F, loanId.intValue());
+            loanTransactionHelper.makeLoanRepayment(loanId, "Repayment", "1 February 2021", 100.84);
 
             verifyTransactions(loanId, transaction(250.0, "Disbursement", "01 January 2021"), //
                     transaction(750.0, "Disbursement", "01 January 2021"), //
@@ -1093,7 +1069,7 @@ public class LoanInterestRefundTest extends BaseLoanIntegrationTest {
         });
         runAt("22 January 2021", () -> {
             Long loanId = loanIdRef.get();
-            loanTransactionHelper.makeLoanRepayment("MerchantIssuedRefund", "22 January 2021", 250F, loanId.intValue());
+            loanTransactionHelper.makeLoanRepayment(loanId, "MerchantIssuedRefund", "22 January 2021", 250.0);
 
             verifyTransactions(loanId, transaction(200.0, "Disbursement", "01 January 2021"), //
                     transaction(300.0, "Disbursement", "01 January 2021"), //
@@ -1104,8 +1080,7 @@ public class LoanInterestRefundTest extends BaseLoanIntegrationTest {
         });
         runAt("26 January 2021", () -> {
             Long loanId = loanIdRef.get();
-            loanTransactionHelper.makeLoanRepayment("PayoutRefund", "26 January 2021", 400F, loanId.intValue());
-            logLoanTransactions(loanId);
+            loanTransactionHelper.makeLoanRepayment(loanId, "PayoutRefund", "26 January 2021", 400.0);
 
             verifyTransactions(loanId, transaction(200.0, "Disbursement", "01 January 2021"), //
                     transaction(300.0, "Disbursement", "01 January 2021"), //
@@ -1118,9 +1093,9 @@ public class LoanInterestRefundTest extends BaseLoanIntegrationTest {
         });
         runAt("1 April 2021", () -> {
             Long loanId = loanIdRef.get();
-            loanTransactionHelper.makeLoanRepayment("Repayment", "1 February 2021", 171.41F, loanId.intValue());
-            loanTransactionHelper.makeLoanRepayment("Repayment", "1 March 2021", 171.41F, loanId.intValue());
-            loanTransactionHelper.makeLoanRepayment("Repayment", "1 April 2021", 11.24F, loanId.intValue());
+            loanTransactionHelper.makeLoanRepayment(loanId, "Repayment", "1 February 2021", 171.41);
+            loanTransactionHelper.makeLoanRepayment(loanId, "Repayment", "1 March 2021", 171.41);
+            loanTransactionHelper.makeLoanRepayment(loanId, "Repayment", "1 April 2021", 11.24);
 
             verifyTransactions(loanId, transaction(200.0, "Disbursement", "01 January 2021"), //
                     transaction(300.0, "Disbursement", "01 January 2021"), //
@@ -1168,7 +1143,7 @@ public class LoanInterestRefundTest extends BaseLoanIntegrationTest {
         });
         runAt("1 February 2021", () -> {
             Long loanId = loanIdRef.get();
-            loanTransactionHelper.makeLoanRepayment("Repayment", "1 February 2021", 171.41F, loanId.intValue());
+            loanTransactionHelper.makeLoanRepayment(loanId, "Repayment", "1 February 2021", 171.41);
 
             verifyTransactions(loanId, transaction(500.0, "Disbursement", "01 January 2021"), //
                     transaction(500.0, "Disbursement", "05 January 2021"), //
@@ -1176,7 +1151,7 @@ public class LoanInterestRefundTest extends BaseLoanIntegrationTest {
         });
         runAt("13 February 2021", () -> {
             Long loanId = loanIdRef.get();
-            loanTransactionHelper.makeLoanRepayment("PayoutRefund", "13 February 2021", 250F, loanId.intValue());
+            loanTransactionHelper.makeLoanRepayment(loanId, "PayoutRefund", "13 February 2021", 250.0);
 
             verifyTransactions(loanId, transaction(500.0, "Disbursement", "01 January 2021"), //
                     transaction(500.0, "Disbursement", "05 January 2021"), //
@@ -1187,8 +1162,7 @@ public class LoanInterestRefundTest extends BaseLoanIntegrationTest {
         });
         runAt("24 February 2021", () -> {
             Long loanId = loanIdRef.get();
-            loanTransactionHelper.makeLoanRepayment("MerchantIssuedRefund", "24 February 2021", 400F, loanId.intValue());
-            logLoanTransactions(loanId);
+            loanTransactionHelper.makeLoanRepayment(loanId, "MerchantIssuedRefund", "24 February 2021", 400.0);
 
             verifyTransactions(loanId, transaction(500.0, "Disbursement", "01 January 2021"), //
                     transaction(500.0, "Disbursement", "05 January 2021"), //
@@ -1201,8 +1175,8 @@ public class LoanInterestRefundTest extends BaseLoanIntegrationTest {
         });
         runAt("1 April 2021", () -> {
             Long loanId = loanIdRef.get();
-            loanTransactionHelper.makeLoanRepayment("Repayment", "1 March 2021", 171.41F, loanId.intValue());
-            loanTransactionHelper.makeLoanRepayment("Repayment", "1 April 2021", 11.25F, loanId.intValue());
+            loanTransactionHelper.makeLoanRepayment(loanId, "Repayment", "1 March 2021", 171.41);
+            loanTransactionHelper.makeLoanRepayment(loanId, "Repayment", "1 April 2021", 11.25);
             GetLoansLoanIdResponse loanDetails = loanTransactionHelper.getLoanDetails(loanId);
 
             Assertions.assertNotNull(loanDetails);
@@ -1237,7 +1211,7 @@ public class LoanInterestRefundTest extends BaseLoanIntegrationTest {
         });
         runAt("1 February 2021", () -> {
             Long loanId = loanIdRef.get();
-            loanTransactionHelper.makeLoanRepayment("Repayment", "1 February 2021", 171.41F, loanId.intValue());
+            loanTransactionHelper.makeLoanRepayment(loanId, "Repayment", "1 February 2021", 171.41);
 
             verifyTransactions(loanId, transaction(500.0, "Disbursement", "01 January 2021"), //
                     transaction(500.0, "Disbursement", "05 January 2021"), //
@@ -1245,7 +1219,7 @@ public class LoanInterestRefundTest extends BaseLoanIntegrationTest {
         });
         runAt("13 February 2021", () -> {
             Long loanId = loanIdRef.get();
-            loanTransactionHelper.makeLoanRepayment("PayoutRefund", "13 February 2021", 250F, loanId.intValue());
+            loanTransactionHelper.makeLoanRepayment(loanId, "PayoutRefund", "13 February 2021", 250.0);
 
             verifyTransactions(loanId, transaction(500.0, "Disbursement", "01 January 2021"), //
                     transaction(500.0, "Disbursement", "05 January 2021"), //
@@ -1257,13 +1231,12 @@ public class LoanInterestRefundTest extends BaseLoanIntegrationTest {
 
         runAt("1 April 2021", () -> {
             Long loanId = loanIdRef.get();
-            loanTransactionHelper.makeLoanRepayment("Repayment", "1 March 2021", 171.41F, loanId.intValue());
-            loanTransactionHelper.makeLoanRepayment("Repayment", "1 April 2021", 171.41F, loanId.intValue());
+            loanTransactionHelper.makeLoanRepayment(loanId, "Repayment", "1 March 2021", 171.41);
+            loanTransactionHelper.makeLoanRepayment(loanId, "Repayment", "1 April 2021", 171.41);
         });
         runAt("6 April 2021", () -> {
             Long loanId = loanIdRef.get();
-            loanTransactionHelper.makeLoanRepayment("MerchantIssuedRefund", "6 April 2021", 400F, loanId.intValue());
-            logLoanTransactions(loanId);
+            loanTransactionHelper.makeLoanRepayment(loanId, "MerchantIssuedRefund", "6 April 2021", 400.0);
 
             verifyTransactions(loanId, transaction(500.0, "Disbursement", "01 January 2021"), //
                     transaction(500.0, "Disbursement", "05 January 2021"), //
@@ -1307,7 +1280,7 @@ public class LoanInterestRefundTest extends BaseLoanIntegrationTest {
         });
         runAt("12 January 2021", () -> {
             Long loanId = loanIdRef.get();
-            loanTransactionHelper.makeLoanRepayment("PayoutRefund", "12 January 2021", 400F, loanId.intValue());
+            loanTransactionHelper.makeLoanRepayment(loanId, "PayoutRefund", "12 January 2021", 400.0);
 
             verifyTransactions(loanId, //
                     transaction(1000.0, "Disbursement", "01 January 2021"), //
@@ -1317,7 +1290,7 @@ public class LoanInterestRefundTest extends BaseLoanIntegrationTest {
         });
         runAt("22 January 2021", () -> {
             Long loanId = loanIdRef.get();
-            loanTransactionHelper.makeLoanRepayment("MerchantIssuedRefund", "17 January 2021", 150F, loanId.intValue());
+            loanTransactionHelper.makeLoanRepayment(loanId, "MerchantIssuedRefund", "17 January 2021", 150.0);
 
             verifyTransactions(loanId, transaction(1000.0, "Disbursement", "01 January 2021"), //
                     transaction(400.0, "Payout Refund", "12 January 2021"), //
@@ -1329,12 +1302,11 @@ public class LoanInterestRefundTest extends BaseLoanIntegrationTest {
 
         runAt("1 February 2021", () -> {
             Long loanId = loanIdRef.get();
-            loanTransactionHelper.makeLoanRepayment("Repayment", "1 February 2021", 171.5F, loanId.intValue());
+            loanTransactionHelper.makeLoanRepayment(loanId, "Repayment", "1 February 2021", 171.5);
         });
         runAt("8 February 2021", () -> {
             Long loanId = loanIdRef.get();
-            loanTransactionHelper.makeLoanRepayment("PayoutRefund", "8 February 2021", 250F, loanId.intValue());
-            logLoanTransactions(loanId);
+            loanTransactionHelper.makeLoanRepayment(loanId, "PayoutRefund", "8 February 2021", 250.0);
 
             verifyTransactions(loanId, transaction(1000.0, "Disbursement", "01 January 2021"), //
                     transaction(400.0, "Payout Refund", "12 January 2021"), //
@@ -1348,7 +1320,7 @@ public class LoanInterestRefundTest extends BaseLoanIntegrationTest {
         });
         runAt("1 March 2021", () -> {
             Long loanId = loanIdRef.get();
-            loanTransactionHelper.makeLoanRepayment("Repayment", "1 March 2021", 30.43F, loanId.intValue());
+            loanTransactionHelper.makeLoanRepayment(loanId, "Repayment", "1 March 2021", 30.43);
             GetLoansLoanIdResponse loanDetails = loanTransactionHelper.getLoanDetails(loanId);
             Assertions.assertNotNull(loanDetails);
             Assertions.assertNotNull(loanDetails.getStatus());
@@ -1378,16 +1350,14 @@ public class LoanInterestRefundTest extends BaseLoanIntegrationTest {
         });
         runAt("22 January 2021", () -> {
             Long loanId = loanIdRef.get();
-            loanTransactionHelper.makeLoanRepayment("MerchantIssuedRefund", "22 January 2021", 1000F, loanId.intValue());
-            logLoanTransactions(loanId);
+            loanTransactionHelper.makeLoanRepayment(loanId, "MerchantIssuedRefund", "22 January 2021", 1000.0);
 
             verifyTransactions(loanId, transaction(1000.0, "Disbursement", "01 January 2021"), //
                     transaction(1000.0, "Merchant Issued Refund", "22 January 2021"), //
                     transaction(5.70, "Interest Refund", "22 January 2021"), //
                     transaction(5.70, "Accrual", "22 January 2021") //
             );
-            loanTransactionHelper.makeLoanRepayment("Repayment", "10 January 2021", 85.63F, loanId.intValue());
-            logLoanTransactions(loanId);
+            loanTransactionHelper.makeLoanRepayment(loanId, "Repayment", "10 January 2021", 85.63);
 
             verifyTransactions(loanId, transaction(1000.0, "Disbursement", "01 January 2021"), //
                     transaction(85.63, "Repayment", "10 January 2021"), //
@@ -1417,14 +1387,12 @@ public class LoanInterestRefundTest extends BaseLoanIntegrationTest {
             Assertions.assertNotNull(loanId);
 
             disburseLoan(loanId, BigDecimal.valueOf(1000), "1 January 2021");
-            loanTransactionHelper.makeLoanRepayment("MerchantIssuedRefund", "1 January 2021", 1000F, loanId.intValue());
-            logLoanTransactions(loanId);
+            loanTransactionHelper.makeLoanRepayment(loanId, "MerchantIssuedRefund", "1 January 2021", 1000.0);
 
             verifyTransactions(loanId, //
                     transaction(1000.0, "Disbursement", "01 January 2021"), //
                     transaction(1000.0, "Merchant Issued Refund", "01 January 2021") //
             );
-            logLoanTransactions(loanId);
         });
     }
 
@@ -1450,8 +1418,7 @@ public class LoanInterestRefundTest extends BaseLoanIntegrationTest {
         });
         runAt("10 January 2021", () -> {
             Long loanId = loanIdRef.get();
-            Long response = loanTransactionHelper.makeLoanRepayment("Repayment", "10 January 2021", 85.63F, loanId.intValue())
-                    .getResourceId();
+            Long response = loanTransactionHelper.makeLoanRepayment(loanId, "Repayment", "10 January 2021", 85.63).getResourceId();
             Assertions.assertNotNull(response);
             repaymentIdRef.set(response);
 
@@ -1461,8 +1428,7 @@ public class LoanInterestRefundTest extends BaseLoanIntegrationTest {
         });
         runAt("22 January 2021", () -> {
             Long loanId = loanIdRef.get();
-            loanTransactionHelper.makeLoanRepayment("MerchantIssuedRefund", "22 January 2021", 1000F, loanId.intValue());
-            logLoanTransactions(loanId);
+            loanTransactionHelper.makeLoanRepayment(loanId, "MerchantIssuedRefund", "22 January 2021", 1000.0);
 
             verifyTransactions(loanId, transaction(1000.0, "Disbursement", "01 January 2021"), //
                     transaction(85.63, "Repayment", "10 January 2021"), //
@@ -1472,8 +1438,7 @@ public class LoanInterestRefundTest extends BaseLoanIntegrationTest {
             );
 
             Long repaymentId = repaymentIdRef.get();
-            loanTransactionHelper.reverseLoanTransaction(loanId.intValue(), repaymentId, "10 January 2021", responseSpec);
-            logLoanTransactions(loanId);
+            loanTransactionHelper.reverseLoanTransaction(loanId, repaymentId, "10 January 2021");
 
             verifyTransactions(loanId, transaction(1000.0, "Disbursement", "01 January 2021"), //
                     reversedTransaction(85.63, "Repayment", "10 January 2021"), //
@@ -1515,12 +1480,14 @@ public class LoanInterestRefundTest extends BaseLoanIntegrationTest {
         });
         runAt("22 January 2021", () -> {
             Long loanId = loanIdRef.get();
-            loanTransactionHelper.makeLoanRepayment("MerchantIssuedRefund", "22 January 2021", 1000F, loanId.intValue());
-            logLoanTransactions(loanId);
-            GetLoansLoanIdResponse loanDetails = loanTransactionHelper.getLoan(requestSpec, responseSpec, loanId.intValue());
-            Optional<GetLoansLoanIdTransactions> optInterestRefundTransaction = loanDetails.getTransactions().stream()
-                    .filter(item -> Objects.equals(item.getType().getValue(), "Interest Refund")).findFirst();
-            final Long interestRefundTransactionId = optInterestRefundTransaction.get().getId();
+            loanTransactionHelper.makeLoanRepayment(loanId, "MerchantIssuedRefund", "22 January 2021", 1000.0);
+            GetLoansLoanIdResponse loanDetails = loanTransactionHelper.getLoanDetails(loanId);
+            Assertions.assertNotNull(loanDetails.getTransactions());
+            Optional<GetLoansLoanIdTransactions> optInterestRefundTransaction = loanDetails.getTransactions().stream().filter(item -> {
+                Assertions.assertNotNull(item.getType());
+                return Objects.equals(item.getType().getValue(), "Interest Refund");
+            }).findFirst();
+            final Long interestRefundTransactionId = optInterestRefundTransaction.orElseThrow().getId();
 
             CallFailedRuntimeException exception = assertThrows(CallFailedRuntimeException.class,
                     () -> loanTransactionHelper.reverseLoanTransaction(loanId, interestRefundTransactionId,
@@ -1531,36 +1498,139 @@ public class LoanInterestRefundTest extends BaseLoanIntegrationTest {
 
             Optional<GetLoansLoanIdTransactions> optMerchantIssuedTransaction = loanDetails.getTransactions().stream()
                     .filter(item -> Objects.equals(item.getType().getValue(), "Merchant Issued Refund")).findFirst();
-            final Long merchantIssuedTransactionId = optMerchantIssuedTransaction.get().getId();
+            final Long merchantIssuedTransactionId = optMerchantIssuedTransaction.orElseThrow().getId();
 
             loanTransactionHelper.reverseLoanTransaction(loanId, merchantIssuedTransactionId,
                     new PostLoansLoanIdTransactionsTransactionIdRequest().dateFormat(DATETIME_PATTERN).transactionDate("22 January 2021")
                             .transactionAmount(0.0).locale("en"));
 
-            loanDetails = loanTransactionHelper.getLoan(requestSpec, responseSpec, loanId.intValue());
+            loanDetails = loanTransactionHelper.getLoanDetails(loanId);
+            Assertions.assertNotNull(loanDetails.getTransactions());
             optInterestRefundTransaction = loanDetails.getTransactions().stream()
                     .filter(item -> Objects.equals(item.getType().getValue(), "Interest Refund")).findFirst();
-            assertEquals(Boolean.TRUE, optInterestRefundTransaction.get().getManuallyReversed());
+            assertEquals(Boolean.TRUE, optInterestRefundTransaction.orElseThrow().getManuallyReversed());
         });
     }
 
-    private void logInstallmentsOfLoanDetails(GetLoansLoanIdResponse loanDetails) {
-        log.info("index, dueDate, principal, fee, penalty, interest");
-        if (loanDetails != null && loanDetails.getRepaymentSchedule() != null && loanDetails.getRepaymentSchedule().getPeriods() != null) {
-            loanDetails.getRepaymentSchedule().getPeriods()
-                    .forEach(period -> log.info("{}, \"{}\", {}, {}, {}, {}", period.getPeriod(),
-                            DateTimeFormatter.ofPattern(DATETIME_PATTERN, Locale.ENGLISH)
-                                    .format(Objects.requireNonNull(period.getDueDate())),
-                            period.getPrincipalDue(), period.getFeeChargesDue(), period.getPenaltyChargesDue(), period.getInterestDue()));
-        }
+    AdvancedPaymentData createPaymentAllocationInterestPrincipalPenaltyFee(String transactionType, String futureInstallmentAllocationRule) {
+        AdvancedPaymentData advancedPaymentData = new AdvancedPaymentData();
+        advancedPaymentData.setTransactionType(transactionType);
+        advancedPaymentData.setFutureInstallmentAllocationRule(futureInstallmentAllocationRule);
+
+        List<PaymentAllocationOrder> paymentAllocationOrders = getPaymentAllocationOrder(PaymentAllocationType.PAST_DUE_INTEREST,
+                PaymentAllocationType.PAST_DUE_PRINCIPAL, PaymentAllocationType.PAST_DUE_PENALTY, PaymentAllocationType.PAST_DUE_FEE,
+                PaymentAllocationType.DUE_INTEREST, PaymentAllocationType.DUE_PRINCIPAL, PaymentAllocationType.DUE_PENALTY,
+                PaymentAllocationType.DUE_FEE, PaymentAllocationType.IN_ADVANCE_INTEREST, PaymentAllocationType.IN_ADVANCE_PRINCIPAL,
+                PaymentAllocationType.IN_ADVANCE_PENALTY, PaymentAllocationType.IN_ADVANCE_FEE);
+
+        advancedPaymentData.setPaymentAllocationOrder(paymentAllocationOrders);
+        return advancedPaymentData;
     }
 
-    private void logLoanTransactions(Long loanId) {
-        GetLoansLoanIdResponse loanDetails = loanTransactionHelper.getLoan(requestSpec, responseSpec, loanId.intValue());
-        if (loanDetails.getTransactions() != null) {
-            loanDetails.getTransactions()
-                    .forEach(tr -> log.info("Transaction {}  {}  {} ", tr.getType().getValue(), tr.getDate(), tr.getAmount()));
-        }
+    private Long createLoanProduct() {
+        PostLoanProductsResponse loanProduct = loanProductHelper.createLoanProduct(create4IProgressive() //
+                .daysInMonthType(DaysInMonthType.ACTUAL) //
+                .daysInYearType(DaysInYearType.ACTUAL) //
+                .isInterestRecalculationEnabled(true) //
+                .addSupportedInterestRefundTypesItem(SupportedInterestRefundTypesItem.PAYOUT_REFUND) //
+                .addSupportedInterestRefundTypesItem(SupportedInterestRefundTypesItem.MERCHANT_ISSUED_REFUND) //
+                .recalculationRestFrequencyType(RecalculationRestFrequencyType.DAILY) //
+                .paymentAllocation(List.of(//
+                        createPaymentAllocationInterestPrincipalPenaltyFee("DEFAULT", FuturePaymentAllocationRule.NEXT_INSTALLMENT), //
+                        createPaymentAllocationInterestPrincipalPenaltyFee("PAYOUT_REFUND", FuturePaymentAllocationRule.LAST_INSTALLMENT), //
+                        createPaymentAllocationInterestPrincipalPenaltyFee("MERCHANT_ISSUED_REFUND",
+                                FuturePaymentAllocationRule.LAST_INSTALLMENT))) //
+        );
+        Assertions.assertNotNull(loanProduct.getResourceId());
+        return loanProduct.getResourceId();
     }
 
+    private Long loanProductId = null;
+
+    private Long getOrCreateLoanProduct() {
+        if (loanProductId == null) {
+            loanProductId = createLoanProduct();
+        }
+        return loanProductId;
+    }
+
+    @Test
+    public void verifyMerchantIssuedRefundPostingForBackdatedLoan() {
+        runAt("29 January 2025", () -> {
+            Long loanProductId = getOrCreateLoanProduct();
+            Long loanId = applyAndApproveProgressiveLoan(client.getClientId(), loanProductId, "29 August 2024", 450.0, 26.0, 12, null);
+            Assertions.assertNotNull(loanId);
+            disburseLoan(loanId, BigDecimal.valueOf(450.0), "29 August 2024");
+
+            PostLoansLoanIdTransactionsResponse repayment = loanTransactionHelper.makeLoanRepayment(loanId, "MerchantIssuedRefund",
+                    "29 January 2025", 500.0);
+            Assertions.assertNotNull(repayment);
+            Assertions.assertNotNull(repayment.getResourceId());
+
+            verifyTransactions(loanId, //
+                    transaction(450.0, "Disbursement", "29 August 2024"), //
+                    transaction(500.0, "Merchant Issued Refund", "29 January 2025"), //
+                    transaction(48.94, "Interest Refund", "29 January 2025"), //
+                    transaction(48.94, "Accrual", "29 January 2025") //
+            ); //
+        });
+    }
+
+    /**
+     * Goal: test Merchant issued Refund does not cause infinite loop in special case of 2 transaction. * interest
+     * recalculation should be on. * merchant issued refund payment allocation should set to Last installment * default
+     * payment allocation should set to Next Installment Make a repayment to repay first instalment on its due date Make
+     * MerchantIssuedRefund to fully repay almost all the installments. 2nd installment should be fully unpaid and 3rd
+     * installment should have less outstanding principal portion than the total outstanding interest on the loan ( 2nd
+     * installment ). Make a 2nd MerchantIssuedRefund equal to remaining principal. Verify Repayment schedules and
+     * transactions. Verify that the loan become overpaid by the amount of 2nd interest refund.
+     */
+    @Test
+    public void verifyMerchantIssuedRefundInTwoPortion() {
+        runAt("1 February 2025", () -> {
+            Long loanProductId = getOrCreateLoanProduct();
+            Long loanId = applyAndApproveProgressiveLoan(client.getClientId(), loanProductId, "1 January 2025", 100.0, 26.0, 6, null);
+            Assertions.assertNotNull(loanId);
+            disburseLoan(loanId, BigDecimal.valueOf(100.0), "1 January 2025");
+            loanTransactionHelper.makeLoanRepayment(loanId, "Repayment", "1 February 2025", 17.94);
+            loanTransactionHelper.makeLoanRepayment(loanId, "MerchantIssuedRefund", "1 February 2025", 66.41);
+            verifyTransactions(loanId, //
+                    transaction(100.0, "Disbursement", "01 January 2025"), //
+                    transaction(17.94, "Repayment", "01 February 2025"), //
+                    transaction(66.41, "Merchant Issued Refund", "01 February 2025"), //
+                    transaction(1.47, "Interest Refund", "01 February 2025") //
+            );
+            verifyRepaymentSchedule(loanId, //
+                    installment(100.0, null, "01 January 2025"), //
+                    installment(15.73, 2.21, 0.0, true, "01 February 2025"), //
+                    installment(17.61, 0.33, 16.47, false, "01 March 2025"), //
+                    installment(12.84, 0.01, 0.26, false, "01 April 2025"), //
+                    installment(17.94, 0.0, 0.0, true, "01 May 2025"), //
+                    installment(17.94, 0.0, 0.0, true, "01 June 2025"), //
+                    installment(17.94, 0.0, 0.0, true, "01 July 2025") //
+            );
+            loanTransactionHelper.makeLoanRepayment(loanId, "MerchantIssuedRefund", "1 February 2025", 16.39);
+            verifyTransactions(loanId, //
+                    transaction(100.0, "Disbursement", "01 January 2025"), //
+                    transaction(17.94, "Repayment", "01 February 2025"), //
+                    transaction(66.41, "Merchant Issued Refund", "01 February 2025"), //
+                    transaction(1.47, "Interest Refund", "01 February 2025"), //
+                    transaction(16.39, "Merchant Issued Refund", "01 February 2025"), //
+                    transaction(0.36, "Interest Refund", "01 February 2025"), //
+                    transaction(2.21, "Accrual", "01 February 2025") //
+            );
+            verifyRepaymentSchedule(loanId, //
+                    installment(100.0, null, "01 January 2025"), //
+                    installment(15.73, 2.21, 0.0, true, "01 February 2025"), //
+                    installment(12.51, 0.0, 0.0, true, "01 March 2025"), //
+                    installment(17.94, 0.0, 0.0, true, "01 April 2025"), //
+                    installment(17.94, 0.0, 0.0, true, "01 May 2025"), //
+                    installment(17.94, 0.0, 0.0, true, "01 June 2025"), //
+                    installment(17.94, 0.0, 0.0, true, "01 July 2025") //
+            );
+            GetLoansLoanIdResponse loanDetails = loanTransactionHelper.getLoanDetails(loanId);
+            verifyLoanStatus(loanDetails, LoanStatus.OVERPAID);
+            Assertions.assertEquals(0.36, loanDetails.getTotalOverpaid());
+        });
+    }
 }
