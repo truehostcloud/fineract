@@ -48,5 +48,5 @@ jobs:
             -Djib.to.auth.username=${{secrets.DOCKERHUB_USERNAME}} \
             -Djib.to.auth.password=${{secrets.DOCKERHUB_PASSWORD}} \
             -Djib.from.platforms=linux/amd64,linux/arm64 \
-            -Djib.to.image=apache/fineract \
+            -Djib.to.image=truehostcloud/fineract-base \
             -Djib.to.tags=$TAGS
