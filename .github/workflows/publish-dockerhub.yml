@@ -45,8 +45,8 @@ jobs:
             TAGS="$TAGS,${{ steps.git_hashes.outputs.short_hash }},${{ steps.git_hashes.outputs.long_hash }}"
           fi
           ./gradlew --no-daemon --console=plain :fineract-provider:jib -x test -x cucumber \
-            -Djib.to.auth.username=${{secrets.DOCKERHUB_PASSWORD}} \
-            -Djib.to.auth.password=${{secrets.DOCKERHUB_USERNAME}} \
+            -Djib.to.auth.username=${{secrets.DOCKERHUB_USERNAME}} \
+            -Djib.to.auth.password=${{secrets.DOCKERHUB_PASSWORD}} \
             -Djib.from.platforms=linux/amd64,linux/arm64 \
             -Djib.to.image=apache/fineract \
             -Djib.to.tags=$TAGS
