@@ -18,6 +18,11 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Modify Email Welcome Message
+        run: |
+          sed -i 's/Mifos/Jisort/g' fineract-provider/src/main/java/org/apache/fineract/infrastructure/core/service/GmailBackedPlatformEmailService.java
+          sed -i '/You must change this password upon first log in using Uppercase, Lowercase, number and character.\\n/d' fineract-provider/src/main/java/org/apache/fineract/infrastructure/core/service/GmailBackedPlatformEmailService.java
+
       - name: Set up JDK 17
         uses: actions/setup-java@3a4f6e1af504cf6a31855fa899c6aa5355ba6c12 # v4
         with:
@@ -44,9 +49,9 @@ jobs:
           if [ "${{ steps.extract_branch.outputs.branch }}" == "develop" ]; then
             TAGS="$TAGS,${{ steps.git_hashes.outputs.short_hash }},${{ steps.git_hashes.outputs.long_hash }}"
           fi
-          ./gradlew --no-daemon --console=plain :fineract-provider:jib -x test -x cucumber \
-            -Djib.to.auth.username=${{secrets.DOCKERHUB_USER}} \
-            -Djib.to.auth.password=${{secrets.DOCKERHUB_TOKEN}} \
+          ./gradlew clean --no-daemon --console=plain :fineract-provider:jib -x test -x cucumber \
+            -Djib.to.auth.username=${{secrets.DOCKERHUB_USERNAME}} \
+            -Djib.to.auth.password=${{secrets.DOCKERHUB_PASSWORD}} \
             -Djib.from.platforms=linux/amd64,linux/arm64 \
-            -Djib.to.image=apache/fineract \
+            -Djib.to.image=truehostcloud/fineract-base \
             -Djib.to.tags=$TAGS
