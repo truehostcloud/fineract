@@ -98,9 +98,12 @@ public class SelfServiceDocumentManagementApiResource {
 
         validateUserHasAccessToEntity(entityType, entityId);
         
-        fileUploadValidator.validate(fileSize, inputStream, fileDetails, bodyPart);
-        final DocumentCommand documentCommand = new DocumentCommand(null, null, entityType, entityId, name, fileDetails.getFileName(),
-                fileSize, bodyPart.getMediaType().toString(), description, null);
+        if (inputStream != null && fileDetails != null && bodyPart != null) {
+            fileUploadValidator.validate(fileSize, inputStream, fileDetails, bodyPart);
+        }
+        
+        final DocumentCommand documentCommand = new DocumentCommand(null, null, entityType, entityId, name, fileDetails != null ? fileDetails.getFileName() : null,
+                fileSize, bodyPart != null ? bodyPart.getMediaType().toString() : null, description, null);
         final Long documentId = this.documentWritePlatformService.createDocument(documentCommand, inputStream);
         return this.toApiJsonSerializer.serialize(CommandProcessingResult.resourceResult(documentId));
     }
@@ -125,7 +128,7 @@ public class SelfServiceDocumentManagementApiResource {
         Set<String> modifiedParams = new HashSet<>(Arrays.asList("name", "description"));
         DocumentCommand documentCommand;
 
-        if (inputStream != null && fileDetails.getFileName() != null) {
+        if (inputStream != null && fileDetails != null && bodyPart != null) {
             fileUploadValidator.validate(fileSize, inputStream, fileDetails, bodyPart);
             modifiedParams.addAll(Arrays.asList("fileName", "size", "type", "location"));
             documentCommand = new DocumentCommand(modifiedParams, documentId, entityType, entityId, name, fileDetails.getFileName(),
