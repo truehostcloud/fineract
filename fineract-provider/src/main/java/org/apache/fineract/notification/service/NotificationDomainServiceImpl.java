@@ -43,6 +43,8 @@ import org.apache.fineract.infrastructure.event.business.domain.savings.transact
 import org.apache.fineract.infrastructure.event.business.domain.share.ShareAccountApproveBusinessEvent;
 import org.apache.fineract.infrastructure.event.business.domain.share.ShareAccountCreateBusinessEvent;
 import org.apache.fineract.infrastructure.event.business.domain.share.ShareProductDividentsCreateBusinessEvent;
+import org.apache.fineract.infrastructure.event.business.domain.document.DocumentCreateBusinessEvent;
+import org.apache.fineract.infrastructure.event.business.domain.document.DocumentDeleteBusinessEvent;
 import org.apache.fineract.infrastructure.event.business.service.BusinessEventNotifierService;
 import org.apache.fineract.infrastructure.security.service.PlatformSecurityContext;
 import org.apache.fineract.portfolio.client.domain.Client;
@@ -55,6 +57,8 @@ import org.apache.fineract.portfolio.savings.domain.RecurringDepositAccount;
 import org.apache.fineract.portfolio.savings.domain.SavingsAccount;
 import org.apache.fineract.portfolio.savings.domain.SavingsAccountTransaction;
 import org.apache.fineract.portfolio.shareaccounts.domain.ShareAccount;
+import org.apache.fineract.infrastructure.documentmanagement.domain.Document;
+import org.apache.fineract.useradministration.domain.AppUser;
 
 @RequiredArgsConstructor
 @Slf4j
@@ -94,6 +98,8 @@ public class NotificationDomainServiceImpl implements NotificationDomainService 
         businessEventNotifierService.addPostBusinessEventListener(ShareAccountCreateBusinessEvent.class, new ShareAccountCreatedListener());
         businessEventNotifierService.addPostBusinessEventListener(ShareAccountApproveBusinessEvent.class,
                 new ShareAccountApprovedListener());
+        businessEventNotifierService.addPostBusinessEventListener(DocumentCreateBusinessEvent.class, new DocumentCreatedListener());
+        businessEventNotifierService.addPostBusinessEventListener(DocumentDeleteBusinessEvent.class, new DocumentDeletedListener());
     }
 
     private final class ClientCreatedListener implements BusinessEventListener<ClientCreateBusinessEvent> {
@@ -310,6 +316,50 @@ public class NotificationDomainServiceImpl implements NotificationDomainService 
             ShareAccount shareAccount = event.get();
             buildNotification("ACTIVATE_SHAREACCOUNT", "shareAccount", shareAccount.getId(), "Share account approved", "approved",
                     context.authenticatedUser().getId(), shareAccount.getOfficeId());
+        }
+    }
+
+    private final class DocumentCreatedListener implements BusinessEventListener<DocumentCreateBusinessEvent> {
+        @Override
+        public void onBusinessEvent(DocumentCreateBusinessEvent event) {
+            Document document = event.get();
+
+            AppUser creator = context.authenticatedUser();
+
+            String notificationMessage = String.format(
+                "%s uploaded a new document [%s]",
+                 creator.getDisplayName(),
+                 document.getName()
+            );
+
+            buildNotification("READ_DOCUMENT", 
+                document.getParentEntityType(), 
+                document.getParentEntityId(),
+                notificationMessage,
+                "created",
+                creator.getId(),
+                creator.getOffice().getId());
+        }
+    }
+
+    private final class DocumentDeletedListener implements BusinessEventListener<DocumentDeleteBusinessEvent> {
+        @Override
+        public void onBusinessEvent(DocumentDeleteBusinessEvent event) {
+            Document document = event.get();
+            AppUser deleter = context.authenticatedUser();
+
+            String notificationMessage = String.format(
+                "%s deleted a document [%s]",
+                deleter.getDisplayName(),
+                document.getName()
+            );
+            buildNotification("READ_DOCUMENT", 
+                document.getParentEntityType(), 
+                document.getParentEntityId(),
+                notificationMessage,
+                "deleted",
+                deleter.getId(),
+                deleter.getOffice().getId());
         }
     }
 
