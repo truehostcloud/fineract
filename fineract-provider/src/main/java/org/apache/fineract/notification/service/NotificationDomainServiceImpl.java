@@ -98,10 +98,8 @@ public class NotificationDomainServiceImpl implements NotificationDomainService 
         businessEventNotifierService.addPostBusinessEventListener(ShareAccountCreateBusinessEvent.class, new ShareAccountCreatedListener());
         businessEventNotifierService.addPostBusinessEventListener(ShareAccountApproveBusinessEvent.class,
                 new ShareAccountApprovedListener());
-        businessEventNotifierService.addPostBusinessEventListener(DocumentCreateBusinessEvent.class, 
-            new DocumentCreatedListener());
-        businessEventNotifierService.addPostBusinessEventListener(DocumentDeleteBusinessEvent.class, 
-            new DocumentDeletedListener());
+        businessEventNotifierService.addPostBusinessEventListener(DocumentCreateBusinessEvent.class, new DocumentCreatedListener());
+        businessEventNotifierService.addPostBusinessEventListener(DocumentDeleteBusinessEvent.class, new DocumentDeletedListener());
     }
 
     private final class ClientCreatedListener implements BusinessEventListener<ClientCreateBusinessEvent> {
