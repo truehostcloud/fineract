@@ -39,6 +39,10 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.orm.jpa.JpaSystemException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.apache.fineract.infrastructure.event.business.service.BusinessEventNotifierService;
+import org.apache.fineract.infrastructure.event.business.domain.document.DocumentCreateBusinessEvent;
+import org.apache.fineract.infrastructure.event.business.domain.document.DocumentDeleteBusinessEvent;
+
 
 @Service
 public class DocumentWritePlatformServiceJpaRepositoryImpl implements DocumentWritePlatformService {
@@ -48,13 +52,15 @@ public class DocumentWritePlatformServiceJpaRepositoryImpl implements DocumentWr
     private final PlatformSecurityContext context;
     private final DocumentRepository documentRepository;
     private final ContentRepositoryFactory contentRepositoryFactory;
+    private final BusinessEventNotifierService businessEventNotifierService;
 
     @Autowired
     public DocumentWritePlatformServiceJpaRepositoryImpl(final PlatformSecurityContext context, final DocumentRepository documentRepository,
-            final ContentRepositoryFactory documentStoreFactory) {
+            final ContentRepositoryFactory documentStoreFactory, final BusinessEventNotifierService businessEventNotifierService) {
         this.context = context;
         this.documentRepository = documentRepository;
         this.contentRepositoryFactory = documentStoreFactory;
+        this.businessEventNotifierService = businessEventNotifierService;
     }
 
     @Transactional
@@ -78,6 +84,8 @@ public class DocumentWritePlatformServiceJpaRepositoryImpl implements DocumentWr
                     documentCommand.getDescription(), fileLocation, contentRepository.getStorageType());
 
             this.documentRepository.saveAndFlush(document);
+
+            this.businessEventNotifierService.notifyPostBusinessEvent(new DocumentCreateBusinessEvent(document));
 
             return document.getId();
         } catch (final JpaSystemException | DataIntegrityViolationException dve) {
@@ -154,6 +162,7 @@ public class DocumentWritePlatformServiceJpaRepositoryImpl implements DocumentWr
         final Document document = this.documentRepository.findById(documentCommand.getId())
                 .orElseThrow(() -> new DocumentNotFoundException(documentCommand.getParentEntityType(), documentCommand.getParentEntityId(),
                         documentCommand.getId()));
+        this.businessEventNotifierService.notifyPostBusinessEvent(new DocumentDeleteBusinessEvent(document));
         this.documentRepository.delete(document);
 
         final ContentRepository contentRepository = this.contentRepositoryFactory.getRepository(document.storageType());
