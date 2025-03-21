@@ -162,8 +162,8 @@ public class DocumentWritePlatformServiceJpaRepositoryImpl implements DocumentWr
         final Document document = this.documentRepository.findById(documentCommand.getId())
                 .orElseThrow(() -> new DocumentNotFoundException(documentCommand.getParentEntityType(), documentCommand.getParentEntityId(),
                         documentCommand.getId()));
-        this.businessEventNotifierService.notifyPostBusinessEvent(new DocumentDeleteBusinessEvent(document));
         this.documentRepository.delete(document);
+        this.businessEventNotifierService.notifyPostBusinessEvent(new DocumentDeleteBusinessEvent(document));
 
         final ContentRepository contentRepository = this.contentRepositoryFactory.getRepository(document.storageType());
         contentRepository.deleteFile(document.getLocation());
