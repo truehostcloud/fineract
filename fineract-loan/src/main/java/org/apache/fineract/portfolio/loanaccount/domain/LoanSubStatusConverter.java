@@ -16,26 +16,21 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.fineract.cob.api;
+package org.apache.fineract.portfolio.loanaccount.domain;
 
-import io.swagger.v3.oas.annotations.media.Schema;
-import java.util.List;
-import org.apache.fineract.cob.domain.LoanAccountLock;
+import jakarta.persistence.AttributeConverter;
+import jakarta.persistence.Converter;
 
-final class LoanAccountLockApiResourceSwagger {
+@Converter(autoApply = true)
+public class LoanSubStatusConverter implements AttributeConverter<LoanSubStatus, Integer> {
 
-    private LoanAccountLockApiResourceSwagger() {
-
+    @Override
+    public Integer convertToDatabaseColumn(LoanSubStatus attribute) {
+        return attribute == null ? null : attribute.getValue();
     }
 
-    @Schema(description = "GetLoanAccountLockResponse")
-    public static final class GetLoanAccountLockResponse {
-
-        private GetLoanAccountLockResponse() {}
-
-        public int page;
-        public int limit;
-        public List<LoanAccountLock> content;
-
+    @Override
+    public LoanSubStatus convertToEntityAttribute(Integer dbData) {
+        return dbData == null ? null : LoanSubStatus.fromInt(dbData);
     }
 }

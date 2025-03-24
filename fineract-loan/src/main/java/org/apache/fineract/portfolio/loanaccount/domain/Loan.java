@@ -28,6 +28,7 @@ import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.JoinTable;
@@ -107,6 +108,7 @@ import org.apache.fineract.portfolio.loanaccount.data.HolidayDetailDTO;
 import org.apache.fineract.portfolio.loanaccount.data.LoanTermVariationsData;
 import org.apache.fineract.portfolio.loanaccount.data.OutstandingAmountsDTO;
 import org.apache.fineract.portfolio.loanaccount.data.ScheduleGeneratorDTO;
+import org.apache.fineract.portfolio.loanaccount.data.TransactionChangeData;
 import org.apache.fineract.portfolio.loanaccount.domain.transactionprocessor.LoanRepaymentScheduleTransactionProcessor;
 import org.apache.fineract.portfolio.loanaccount.domain.transactionprocessor.MoneyHolder;
 import org.apache.fineract.portfolio.loanaccount.domain.transactionprocessor.TransactionCtx;
@@ -182,8 +184,9 @@ public class Loan extends AbstractAuditableWithUTCDateTimeCustom<Long> {
     @JoinColumn(name = "glim_id")
     private GroupLoanIndividualMonitoringAccount glim;
 
+    @Enumerated
     @Column(name = "loan_type_enum", nullable = false)
-    private Integer loanType;
+    private AccountType loanType;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "product_id", nullable = false)
@@ -226,12 +229,13 @@ public class Loan extends AbstractAuditableWithUTCDateTimeCustom<Long> {
     private Integer termFrequency;
 
     @Setter()
+    @Enumerated
     @Column(name = "term_period_frequency_enum", nullable = false)
-    private Integer termPeriodFrequencyType;
+    private PeriodFrequencyType termPeriodFrequencyType;
 
     @Setter(AccessLevel.PACKAGE)
     @Column(name = "loan_status_id", nullable = false)
-    private Integer loanStatus;
+    private LoanStatus loanStatus;
 
     @Setter()
     @Column(name = "sync_disbursement_with_meeting")
@@ -434,7 +438,7 @@ public class Loan extends AbstractAuditableWithUTCDateTimeCustom<Long> {
 
     @Setter
     @Column(name = "loan_sub_status_id")
-    private Integer loanSubStatus;
+    private LoanSubStatus loanSubStatus;
 
     @Column(name = "is_topup", nullable = false)
     private boolean isTopup = false;
@@ -552,7 +556,7 @@ public class Loan extends AbstractAuditableWithUTCDateTimeCustom<Long> {
         }
         this.client = client;
         this.group = group;
-        this.loanType = loanType.getValue();
+        this.loanType = loanType;
         this.fund = fund;
         this.loanOfficer = loanOfficer;
         this.loanPurpose = loanPurpose;
@@ -561,11 +565,7 @@ public class Loan extends AbstractAuditableWithUTCDateTimeCustom<Long> {
         this.transactionProcessingStrategyName = transactionProcessingStrategy.getName();
 
         this.loanProduct = loanProduct;
-        if (loanStatus != null) {
-            this.loanStatus = loanStatus.getValue();
-        } else {
-            this.loanStatus = null;
-        }
+        this.loanStatus = loanStatus;
         if (loanCharges != null && !loanCharges.isEmpty()) {
             this.charges = associateChargesWithThisLoan(loanCharges);
             this.summary = updateSummaryWithTotalFeeChargesDueAtDisbursement(deriveSumTotalOfChargesDueAtDisbursement());
@@ -606,10 +606,10 @@ public class Loan extends AbstractAuditableWithUTCDateTimeCustom<Long> {
 
         // Add net get net disbursal amount from charges and principal
         this.netDisbursalAmount = this.approvedPrincipal.subtract(deriveSumTotalOfChargesDueAtDisbursement());
-        this.loanStatus = LoanStatus.SUBMITTED_AND_PENDING_APPROVAL.getValue();
+        this.loanStatus = LoanStatus.SUBMITTED_AND_PENDING_APPROVAL;
         this.externalId = externalId;
         this.termFrequency = loanApplicationTerms.getLoanTermFrequency();
-        this.termPeriodFrequencyType = loanApplicationTerms.getLoanTermPeriodFrequencyType().getValue();
+        this.termPeriodFrequencyType = loanApplicationTerms.getLoanTermPeriodFrequencyType();
         this.expectedDisbursementDate = loanApplicationTerms.getExpectedDisbursementDate();
         this.expectedFirstRepaymentOnDate = loanApplicationTerms.getRepaymentStartFromDate();
         this.interestChargedFromDate = loanApplicationTerms.getInterestChargedFromDate();
@@ -719,10 +719,12 @@ public class Loan extends AbstractAuditableWithUTCDateTimeCustom<Long> {
         ChangedTransactionDetail changedTransactionDetail = loanRepaymentScheduleTransactionProcessor.reprocessLoanTransactions(
                 getDisbursementDate(), allNonContraTransactionsPostDisbursement, getCurrency(), getRepaymentScheduleInstallments(),
                 getActiveCharges());
-        for (final Map.Entry<Long, LoanTransaction> mapEntry : changedTransactionDetail.getNewTransactionMappings().entrySet()) {
-            mapEntry.getValue().updateLoan(this);
+        for (TransactionChangeData change : changedTransactionDetail.getTransactionChanges()) {
+            change.getNewTransaction().updateLoan(this);
         }
-        this.loanTransactions.addAll(changedTransactionDetail.getNewTransactionMappings().values());
+        final List<LoanTransaction> newTransactions = changedTransactionDetail.getTransactionChanges().stream()
+                .map(TransactionChangeData::getNewTransaction).toList();
+        this.loanTransactions.addAll(newTransactions);
         updateLoanSummaryDerivedFields();
         return changedTransactionDetail;
     }
@@ -1824,10 +1826,6 @@ public class Loan extends AbstractAuditableWithUTCDateTimeCustom<Long> {
     }
 
     public LoanStatus getStatus() {
-        return this.loanStatus == null ? null : LoanStatus.fromInt(this.loanStatus);
-    }
-
-    public Integer getPlainStatus() {
         return this.loanStatus;
     }
 
@@ -2447,11 +2445,11 @@ public class Loan extends AbstractAuditableWithUTCDateTimeCustom<Long> {
     }
 
     public boolean isGroupLoan() {
-        return AccountType.fromInt(this.loanType).isGroupAccount();
+        return this.loanType.isGroupAccount();
     }
 
     public boolean isJLGLoan() {
-        return AccountType.fromInt(this.loanType).isJLGAccount();
+        return this.loanType.isJLGAccount();
     }
 
     public void updateInterestRateFrequencyType() {
@@ -2656,14 +2654,16 @@ public class Loan extends AbstractAuditableWithUTCDateTimeCustom<Long> {
         ChangedTransactionDetail changedTransactionDetail = loanRepaymentScheduleTransactionProcessor.reprocessLoanTransactions(
                 getDisbursementDate(), allNonContraTransactionsPostDisbursement, getCurrency(), getRepaymentScheduleInstallments(),
                 getActiveCharges());
-        for (final Map.Entry<Long, LoanTransaction> mapEntry : changedTransactionDetail.getNewTransactionMappings().entrySet()) {
-            mapEntry.getValue().updateLoan(this);
+        for (TransactionChangeData change : changedTransactionDetail.getTransactionChanges()) {
+            change.getNewTransaction().updateLoan(this);
         }
         /*
          * Commented since throwing exception if external id present for one of the transactions. for this need to save
          * the reversed transactions first and then new transactions.
          */
-        this.loanTransactions.addAll(changedTransactionDetail.getNewTransactionMappings().values());
+        final List<LoanTransaction> newTransactions = changedTransactionDetail.getTransactionChanges().stream()
+                .map(TransactionChangeData::getNewTransaction).toList();
+        this.loanTransactions.addAll(newTransactions);
         updateLoanSummaryDerivedFields();
 
         return changedTransactionDetail;
@@ -2733,7 +2733,6 @@ public class Loan extends AbstractAuditableWithUTCDateTimeCustom<Long> {
 
     public LoanApplicationTerms constructLoanApplicationTerms(final ScheduleGeneratorDTO scheduleGeneratorDTO) {
         final Integer loanTermFrequency = this.termFrequency;
-        final PeriodFrequencyType loanTermPeriodFrequencyType = PeriodFrequencyType.fromInt(this.termPeriodFrequencyType);
         NthDayType nthDayType = null;
         DayOfWeekType dayOfWeekType = null;
         final List<DisbursementData> disbursementData = new ArrayList<>();
@@ -2777,7 +2776,7 @@ public class Loan extends AbstractAuditableWithUTCDateTimeCustom<Long> {
             interestChargedFromDate = getDisbursementDate();
         }
 
-        return LoanApplicationTerms.assembleFrom(scheduleGeneratorDTO.getCurrency(), loanTermFrequency, loanTermPeriodFrequencyType,
+        return LoanApplicationTerms.assembleFrom(scheduleGeneratorDTO.getCurrency(), loanTermFrequency, this.termPeriodFrequencyType,
                 nthDayType, dayOfWeekType, getDisbursementDate(), getExpectedFirstRepaymentOnDate(),
                 scheduleGeneratorDTO.getCalculatedRepaymentsStartingFromDate(), getInArrearsTolerance(), this.loanRepaymentScheduleDetail,
                 this.loanProduct.isMultiDisburseLoan(), this.fixedEmiAmount, disbursementData, this.maxOutstandingLoanBalance,
@@ -3381,7 +3380,7 @@ public class Loan extends AbstractAuditableWithUTCDateTimeCustom<Long> {
     public boolean isForeclosure() {
         boolean isForeClosure = false;
         if (this.loanSubStatus != null) {
-            isForeClosure = LoanSubStatus.fromInt(loanSubStatus).isForeclosed();
+            isForeClosure = loanSubStatus.isForeclosed();
         }
 
         return isForeClosure;
@@ -3459,15 +3458,15 @@ public class Loan extends AbstractAuditableWithUTCDateTimeCustom<Long> {
     }
 
     public boolean hasInvalidLoanType() {
-        return AccountType.fromInt(this.loanType).isInvalid();
+        return getLoanType().isInvalid();
     }
 
     public boolean isIndividualLoan() {
-        return AccountType.fromInt(this.loanType).isIndividualAccount();
+        return getLoanType().isIndividualAccount();
     }
 
     public AccountType getLoanType() {
-        return AccountType.fromInt(loanType);
+        return this.loanType == null ? AccountType.INVALID : this.loanType;
     }
 
     public void adjustNetDisbursalAmount(BigDecimal adjustedAmount) {

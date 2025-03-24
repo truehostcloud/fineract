@@ -16,31 +16,22 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.fineract.infrastructure.core.serialization;
+package org.apache.fineract.mix.data;
 
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
-import org.springframework.stereotype.Component;
+import java.io.Serial;
+import java.io.Serializable;
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
-/**
- * A Google GSON implementation of contract.
- *
- * It serializes all fields of any Java {@link Object} passed to it.
- */
-@Component
-public final class ExcludeNothingWithPrettyPrintingOnJsonSerializerGoogleGson {
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+public class MixTaxonomyRequest implements Serializable {
 
-    private final Gson gson;
+    @Serial
+    private static final long serialVersionUID = 1L;
 
-    public ExcludeNothingWithPrettyPrintingOnJsonSerializerGoogleGson() {
-        final GsonBuilder builder = new GsonBuilder();
-        GoogleGsonSerializerHelper.registerTypeAdapters(builder);
-        builder.setPrettyPrinting();
-
-        this.gson = builder.create();
-    }
-
-    public String serialize(final Object result) {
-        return this.gson.toJson(result);
-    }
+    private String identifier;
+    private String config;
 }

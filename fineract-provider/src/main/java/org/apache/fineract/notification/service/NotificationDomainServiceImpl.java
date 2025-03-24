@@ -58,6 +58,7 @@ import org.apache.fineract.portfolio.savings.domain.SavingsAccount;
 import org.apache.fineract.portfolio.savings.domain.SavingsAccountTransaction;
 import org.apache.fineract.portfolio.shareaccounts.domain.ShareAccount;
 import org.apache.fineract.infrastructure.documentmanagement.domain.Document;
+import org.apache.fineract.useradministration.domain.AppUser;
 
 @RequiredArgsConstructor
 @Slf4j
@@ -97,10 +98,8 @@ public class NotificationDomainServiceImpl implements NotificationDomainService 
         businessEventNotifierService.addPostBusinessEventListener(ShareAccountCreateBusinessEvent.class, new ShareAccountCreatedListener());
         businessEventNotifierService.addPostBusinessEventListener(ShareAccountApproveBusinessEvent.class,
                 new ShareAccountApprovedListener());
-        businessEventNotifierService.addPostBusinessEventListener(DocumentCreateBusinessEvent.class, 
-            new DocumentCreatedListener());
-        businessEventNotifierService.addPostBusinessEventListener(DocumentDeleteBusinessEvent.class, 
-            new DocumentDeletedListener());
+        businessEventNotifierService.addPostBusinessEventListener(DocumentCreateBusinessEvent.class, new DocumentCreatedListener());
+        businessEventNotifierService.addPostBusinessEventListener(DocumentDeleteBusinessEvent.class, new DocumentDeletedListener());
     }
 
     private final class ClientCreatedListener implements BusinessEventListener<ClientCreateBusinessEvent> {
@@ -324,13 +323,22 @@ public class NotificationDomainServiceImpl implements NotificationDomainService 
         @Override
         public void onBusinessEvent(DocumentCreateBusinessEvent event) {
             Document document = event.get();
+
+            AppUser creator = context.authenticatedUser();
+
+            String notificationMessage = String.format(
+                "%s uploaded a new document [%s]",
+                 creator.getDisplayName(),
+                 document.getName()
+            );
+
             buildNotification("READ_DOCUMENT", 
                 document.getParentEntityType(), 
                 document.getParentEntityId(),
-                "New document uploaded: " + document.getName(),
+                notificationMessage,
                 "created",
-                context.authenticatedUser().getId(),
-                context.authenticatedUser().getOffice().getId());
+                creator.getId(),
+                creator.getOffice().getId());
         }
     }
 
@@ -338,13 +346,20 @@ public class NotificationDomainServiceImpl implements NotificationDomainService 
         @Override
         public void onBusinessEvent(DocumentDeleteBusinessEvent event) {
             Document document = event.get();
+            AppUser deleter = context.authenticatedUser();
+
+            String notificationMessage = String.format(
+                "%s deleted a document [%s]",
+                deleter.getDisplayName(),
+                document.getName()
+            );
             buildNotification("READ_DOCUMENT", 
                 document.getParentEntityType(), 
                 document.getParentEntityId(),
-                "Document deleted: " + document.getName(),
+                notificationMessage,
                 "deleted",
-                context.authenticatedUser().getId(),
-                context.authenticatedUser().getOffice().getId());
+                deleter.getId(),
+                deleter.getOffice().getId());
         }
     }
 

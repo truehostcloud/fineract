@@ -34,6 +34,7 @@ import org.apache.fineract.infrastructure.core.service.MathUtil;
 import org.apache.fineract.organisation.monetary.domain.MonetaryCurrency;
 import org.apache.fineract.organisation.monetary.domain.Money;
 import org.apache.fineract.portfolio.loanaccount.data.ScheduleGeneratorDTO;
+import org.apache.fineract.portfolio.loanaccount.data.TransactionChangeData;
 import org.apache.fineract.portfolio.loanaccount.domain.ChangedTransactionDetail;
 import org.apache.fineract.portfolio.loanaccount.domain.Loan;
 import org.apache.fineract.portfolio.loanaccount.domain.LoanRepaymentScheduleInstallment;
@@ -62,18 +63,16 @@ public class ProgressiveLoanInterestRefundServiceImpl implements InterestRefundS
 
     private static void simulateRepaymentForDisbursements(LoanTransaction lt, final AtomicReference<BigDecimal> refundFinal,
             List<LoanTransaction> collect) {
-        collect.add(new LoanTransaction(lt.getLoan(), lt.getLoan().getOffice(), lt.getTypeOf().getValue(), lt.getDateOf(), lt.getAmount(),
+        collect.add(new LoanTransaction(lt.getLoan(), lt.getLoan().getOffice(), lt.getTypeOf(), lt.getDateOf(), lt.getAmount(),
                 BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, false, null, null));
         if (lt.getTypeOf().isDisbursement() && MathUtil.isGreaterThanZero(refundFinal.get())) {
             if (lt.getAmount().compareTo(refundFinal.get()) <= 0) {
-                collect.add(
-                        new LoanTransaction(lt.getLoan(), lt.getLoan().getOffice(), REPAYMENT.getValue(), lt.getDateOf(), lt.getAmount(),
-                                BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, false, null, null));
+                collect.add(new LoanTransaction(lt.getLoan(), lt.getLoan().getOffice(), REPAYMENT, lt.getDateOf(), lt.getAmount(),
+                        BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, false, null, null));
                 refundFinal.set(refundFinal.get().subtract(lt.getAmount()));
             } else {
-                collect.add(
-                        new LoanTransaction(lt.getLoan(), lt.getLoan().getOffice(), REPAYMENT.getValue(), lt.getDateOf(), refundFinal.get(),
-                                BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, false, null, null));
+                collect.add(new LoanTransaction(lt.getLoan(), lt.getLoan().getOffice(), REPAYMENT, lt.getDateOf(), refundFinal.get(),
+                        BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, false, null, null));
                 refundFinal.set(BigDecimal.ZERO);
             }
         }
@@ -92,7 +91,9 @@ public class ProgressiveLoanInterestRefundServiceImpl implements InterestRefundS
         Pair<ChangedTransactionDetail, ProgressiveLoanInterestScheduleModel> reprocessResult = processor
                 .reprocessProgressiveLoanTransactions(loan.getDisbursementDate(), relatedRefundTransactionDate, transactionsToReprocess,
                         loan.getCurrency(), installmentsToReprocess, loan.getActiveCharges());
-        loan.getLoanTransactions().addAll(reprocessResult.getLeft().getCurrentTransactionToOldId().keySet());
+        final List<LoanTransaction> newTransactions = reprocessResult.getLeft().getTransactionChanges().stream()
+                .map(TransactionChangeData::getNewTransaction).toList();
+        loan.getLoanTransactions().addAll(newTransactions);
         ProgressiveLoanInterestScheduleModel modelAfter = reprocessResult.getRight();
 
         return emiCalculator.getSumOfDueInterestsOnDate(modelAfter, relatedRefundTransactionDate);
