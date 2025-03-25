@@ -72,7 +72,7 @@ public class ScorecardReadPlatformServiceImpl implements ScorecardReadPlatformSe
             sb.append(" sc.question_id as questionId, sc.response_id as responseId, ");
             sb.append(" sc.created_on as createdOn, sc.a_value as value ");
             sb.append(" from m_survey_scorecards sc  ");
-            sb.append(" where sc.survey_id = ? and sc.client_id = ?  ");
+            sb.append(" where sc.survey_id = ? and sc.client_id = ? AND sc.id = ? ");
 
             return sb.toString();
         }
@@ -89,15 +89,15 @@ public class ScorecardReadPlatformServiceImpl implements ScorecardReadPlatformSe
         }
     }
 
-    List<ScorecardValue> getScorecardValueBySurveyAndClient(final Long surveyId, final Long clientId) {
+    List<ScorecardValue> getScorecardValueBySurveyAndClient(final Long surveyId, final Long clientId, final Long scorecardId) {
         ScorecardValueMapper scvm = new ScorecardValueMapper();
         String sql = "select " + scvm.schema();
-        return this.jdbcTemplate.query(sql, scvm, new Object[] { surveyId, clientId }); // NOSONAR
+        return this.jdbcTemplate.query(sql, scvm, new Object[] { surveyId, clientId, scorecardId }); // NOSONAR
     }
 
     Collection<ScorecardData> updateScorecardValues(Collection<ScorecardData> scorecard) {
         for (ScorecardData scorecardData : scorecard) {
-            scorecardData.setScorecardValues(getScorecardValueBySurveyAndClient(scorecardData.getSurveyId(), scorecardData.getClientId()));
+            scorecardData.setScorecardValues(getScorecardValueBySurveyAndClient(scorecardData.getSurveyId(), scorecardData.getClientId(), scorecardData.getId()));
         }
         return scorecard;
     }
