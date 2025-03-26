@@ -1,14 +1,5 @@
 package org.apache.fineract.infrastructure.documentmanagement.api;
 
-import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.Parameter;
-import io.swagger.v3.oas.annotations.media.ArraySchema;
-import io.swagger.v3.oas.annotations.media.Content;
-import io.swagger.v3.oas.annotations.media.Schema;
-import io.swagger.v3.oas.annotations.parameters.RequestBody;
-import io.swagger.v3.oas.annotations.responses.ApiResponse;
-import io.swagger.v3.oas.annotations.responses.ApiResponses;
-import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.ws.rs.Consumes;
 import jakarta.ws.rs.DELETE;
 import jakarta.ws.rs.GET;
@@ -47,7 +38,6 @@ import org.springframework.stereotype.Component;
 
 @Component
 @Path("/v1/self/{entityType}/{entityId}/documents")
-@Tag(name = "Self Service Documents", description = "Documents API for self service users")
 @RequiredArgsConstructor
 public class SelfServiceDocumentManagementApiResource {
 
@@ -66,13 +56,9 @@ public class SelfServiceDocumentManagementApiResource {
     @GET
     @Consumes({ MediaType.APPLICATION_JSON })
     @Produces({ MediaType.APPLICATION_JSON })
-    @Operation(summary = "List documents", description = "Example Requests:\n" + "\n" + "self/clients/1/documents\n" + "\n"
-            + "self/client_identifiers/1/documents\n" + "\n" + "self/loans/1/documents?fields=name,description")
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "OK", content = @Content(array = @ArraySchema(schema = @Schema(implementation = DocumentManagementApiResourceSwagger.GetEntityTypeEntityIdDocumentsResponse.class)))) })
     public String retrieveAllDocuments(@Context final UriInfo uriInfo,
-            @PathParam("entityType") @Parameter(description = "entityType") final String entityType,
-            @PathParam("entityId") @Parameter(description = "entityId") final Long entityId) {
+            @PathParam("entityType") final String entityType,
+            @PathParam("entityId") final Long entityId) {
 
         validateUserHasAccessToEntity(entityType, entityId);
 
@@ -84,14 +70,9 @@ public class SelfServiceDocumentManagementApiResource {
     @POST
     @Consumes({ MediaType.MULTIPART_FORM_DATA })
     @Produces({ MediaType.APPLICATION_JSON })
-    @RequestBody(description = "Create document", content = {
-            @Content(mediaType = MediaType.MULTIPART_FORM_DATA, schema = @Schema(implementation = DocumentManagementApiResourceSwagger.DocumentUploadRequest.class)) })
-    @Operation(summary = "Create a Document")
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "OK", content = @Content(schema = @Schema(implementation = DocumentManagementApiResourceSwagger.PostEntityTypeEntityIdDocumentsResponse.class))) })
-    public String createDocument(@PathParam("entityType") @Parameter(description = "entityType") final String entityType,
-            @PathParam("entityId") @Parameter(description = "entityId") final Long entityId,
-            @HeaderParam("Content-Length") @Parameter(description = "Content-Length") final Long fileSize,
+    public String createDocument(@PathParam("entityType") final String entityType,
+            @PathParam("entityId") final Long entityId,
+            @HeaderParam("Content-Length") final Long fileSize,
             @FormDataParam("file") final InputStream inputStream, @FormDataParam("file") final FormDataContentDisposition fileDetails,
             @FormDataParam("file") final FormDataBodyPart bodyPart, @FormDataParam("name") final String name,
             @FormDataParam("description") final String description) {
@@ -112,13 +93,10 @@ public class SelfServiceDocumentManagementApiResource {
     @Path("{documentId}")
     @Consumes({ MediaType.MULTIPART_FORM_DATA })
     @Produces({ MediaType.APPLICATION_JSON })
-    @Operation(summary = "Update a Document")
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "OK", content = @Content(schema = @Schema(implementation = DocumentManagementApiResourceSwagger.PutEntityTypeEntityIdDocumentsResponse.class))) })
-    public String updateDocument(@PathParam("entityType") @Parameter(description = "entityType") final String entityType,
-            @PathParam("entityId") @Parameter(description = "entityId") final Long entityId,
-            @PathParam("documentId") @Parameter(description = "documentId") final Long documentId,
-            @HeaderParam("Content-Length") @Parameter(description = "Content-Length") final Long fileSize,
+    public String updateDocument(@PathParam("entityType") final String entityType,
+            @PathParam("entityId") final Long entityId,
+            @PathParam("documentId") final Long documentId,
+            @HeaderParam("Content-Length") final Long fileSize,
             @FormDataParam("file") final InputStream inputStream, @FormDataParam("file") final FormDataContentDisposition fileDetails,
             @FormDataParam("file") final FormDataBodyPart bodyPart, @FormDataParam("name") final String name,
             @FormDataParam("description") final String description) {
@@ -146,12 +124,9 @@ public class SelfServiceDocumentManagementApiResource {
     @Path("{documentId}")
     @Consumes({ MediaType.APPLICATION_JSON })
     @Produces({ MediaType.APPLICATION_JSON })
-    @Operation(summary = "Retrieve a Document")
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "OK", content = @Content(schema = @Schema(implementation = DocumentManagementApiResourceSwagger.GetEntityTypeEntityIdDocumentsResponse.class))) })
-    public String getDocument(@PathParam("entityType") @Parameter(description = "entityType") final String entityType,
-            @PathParam("entityId") @Parameter(description = "entityId") final Long entityId,
-            @PathParam("documentId") @Parameter(description = "documentId") final Long documentId,
+    public String getDocument(@PathParam("entityType") final String entityType,
+            @PathParam("entityId") final Long entityId,
+            @PathParam("documentId") final Long documentId,
             @Context final UriInfo uriInfo) {
 
         validateUserHasAccessToEntity(entityType, entityId);
@@ -165,11 +140,9 @@ public class SelfServiceDocumentManagementApiResource {
     @Path("{documentId}/attachment")
     @Consumes({ MediaType.APPLICATION_JSON })
     @Produces({ MediaType.APPLICATION_OCTET_STREAM })
-    @Operation(summary = "Retrieve Binary File associated with Document")
-    @ApiResponses({ @ApiResponse(responseCode = "200", description = "OK") })
-    public Response downloadFile(@PathParam("entityType") @Parameter(description = "entityType") final String entityType,
-            @PathParam("entityId") @Parameter(description = "entityId") final Long entityId,
-            @PathParam("documentId") @Parameter(description = "documentId") final Long documentId) {
+    public Response downloadFile(@PathParam("entityType") final String entityType,
+            @PathParam("entityId") final Long entityId,
+            @PathParam("documentId") final Long documentId) {
 
         validateUserHasAccessToEntity(entityType, entityId);
         
@@ -181,12 +154,9 @@ public class SelfServiceDocumentManagementApiResource {
     @Path("{documentId}")
     @Consumes({ MediaType.APPLICATION_JSON })
     @Produces({ MediaType.APPLICATION_JSON })
-    @Operation(summary = "Remove a Document")
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "OK", content = @Content(schema = @Schema(implementation = DocumentManagementApiResourceSwagger.DeleteEntityTypeEntityIdDocumentsResponse.class))) })
-    public String deleteDocument(@PathParam("entityType") @Parameter(description = "entityType") final String entityType,
-            @PathParam("entityId") @Parameter(description = "entityId") final Long entityId,
-            @PathParam("documentId") @Parameter(description = "documentId") final Long documentId) {
+    public String deleteDocument(@PathParam("entityType") final String entityType,
+            @PathParam("entityId") final Long entityId,
+            @PathParam("documentId") final Long documentId) {
 
         validateUserHasAccessToEntity(entityType, entityId);
 
