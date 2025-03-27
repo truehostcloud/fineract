@@ -31,6 +31,9 @@ import org.apache.fineract.infrastructure.documentmanagement.domain.StorageType;
 import org.apache.fineract.infrastructure.documentmanagement.exception.ContentManagementException;
 import org.apache.fineract.infrastructure.documentmanagement.exception.DocumentNotFoundException;
 import org.apache.fineract.infrastructure.documentmanagement.exception.InvalidEntityTypeForDocumentManagementException;
+import org.apache.fineract.infrastructure.event.business.domain.document.DocumentCreateBusinessEvent;
+import org.apache.fineract.infrastructure.event.business.domain.document.DocumentDeleteBusinessEvent;
+import org.apache.fineract.infrastructure.event.business.service.BusinessEventNotifierService;
 import org.apache.fineract.infrastructure.security.service.PlatformSecurityContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -39,10 +42,6 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.orm.jpa.JpaSystemException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.apache.fineract.infrastructure.event.business.service.BusinessEventNotifierService;
-import org.apache.fineract.infrastructure.event.business.domain.document.DocumentCreateBusinessEvent;
-import org.apache.fineract.infrastructure.event.business.domain.document.DocumentDeleteBusinessEvent;
-
 
 @Service
 public class DocumentWritePlatformServiceJpaRepositoryImpl implements DocumentWritePlatformService {

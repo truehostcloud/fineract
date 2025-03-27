@@ -56,8 +56,7 @@ public class SelfServiceDocumentManagementApiResource {
     @GET
     @Consumes({ MediaType.APPLICATION_JSON })
     @Produces({ MediaType.APPLICATION_JSON })
-    public String retrieveAllDocuments(@Context final UriInfo uriInfo,
-            @PathParam("entityType") final String entityType,
+    public String retrieveAllDocuments(@Context final UriInfo uriInfo, @PathParam("entityType") final String entityType,
             @PathParam("entityId") final Long entityId) {
 
         validateUserHasAccessToEntity(entityType, entityId);
@@ -70,21 +69,20 @@ public class SelfServiceDocumentManagementApiResource {
     @POST
     @Consumes({ MediaType.MULTIPART_FORM_DATA })
     @Produces({ MediaType.APPLICATION_JSON })
-    public String createDocument(@PathParam("entityType") final String entityType,
-            @PathParam("entityId") final Long entityId,
-            @HeaderParam("Content-Length") final Long fileSize,
-            @FormDataParam("file") final InputStream inputStream, @FormDataParam("file") final FormDataContentDisposition fileDetails,
-            @FormDataParam("file") final FormDataBodyPart bodyPart, @FormDataParam("name") final String name,
-            @FormDataParam("description") final String description) {
+    public String createDocument(@PathParam("entityType") final String entityType, @PathParam("entityId") final Long entityId,
+            @HeaderParam("Content-Length") final Long fileSize, @FormDataParam("file") final InputStream inputStream,
+            @FormDataParam("file") final FormDataContentDisposition fileDetails, @FormDataParam("file") final FormDataBodyPart bodyPart,
+            @FormDataParam("name") final String name, @FormDataParam("description") final String description) {
 
         validateUserHasAccessToEntity(entityType, entityId);
-        
+
         if (inputStream != null && fileDetails != null && bodyPart != null) {
             fileUploadValidator.validate(fileSize, inputStream, fileDetails, bodyPart);
         }
-        
-        final DocumentCommand documentCommand = new DocumentCommand(null, null, entityType, entityId, name, fileDetails != null ? fileDetails.getFileName() : null,
-                fileSize, bodyPart != null ? bodyPart.getMediaType().toString() : null, description, null);
+
+        final DocumentCommand documentCommand = new DocumentCommand(null, null, entityType, entityId, name,
+                fileDetails != null ? fileDetails.getFileName() : null, fileSize,
+                bodyPart != null ? bodyPart.getMediaType().toString() : null, description, null);
         final Long documentId = this.documentWritePlatformService.createDocument(documentCommand, inputStream);
         return this.toApiJsonSerializer.serialize(CommandProcessingResult.resourceResult(documentId));
     }
@@ -93,10 +91,8 @@ public class SelfServiceDocumentManagementApiResource {
     @Path("{documentId}")
     @Consumes({ MediaType.MULTIPART_FORM_DATA })
     @Produces({ MediaType.APPLICATION_JSON })
-    public String updateDocument(@PathParam("entityType") final String entityType,
-            @PathParam("entityId") final Long entityId,
-            @PathParam("documentId") final Long documentId,
-            @HeaderParam("Content-Length") final Long fileSize,
+    public String updateDocument(@PathParam("entityType") final String entityType, @PathParam("entityId") final Long entityId,
+            @PathParam("documentId") final Long documentId, @HeaderParam("Content-Length") final Long fileSize,
             @FormDataParam("file") final InputStream inputStream, @FormDataParam("file") final FormDataContentDisposition fileDetails,
             @FormDataParam("file") final FormDataBodyPart bodyPart, @FormDataParam("name") final String name,
             @FormDataParam("description") final String description) {
@@ -124,10 +120,8 @@ public class SelfServiceDocumentManagementApiResource {
     @Path("{documentId}")
     @Consumes({ MediaType.APPLICATION_JSON })
     @Produces({ MediaType.APPLICATION_JSON })
-    public String getDocument(@PathParam("entityType") final String entityType,
-            @PathParam("entityId") final Long entityId,
-            @PathParam("documentId") final Long documentId,
-            @Context final UriInfo uriInfo) {
+    public String getDocument(@PathParam("entityType") final String entityType, @PathParam("entityId") final Long entityId,
+            @PathParam("documentId") final Long documentId, @Context final UriInfo uriInfo) {
 
         validateUserHasAccessToEntity(entityType, entityId);
 
@@ -140,12 +134,11 @@ public class SelfServiceDocumentManagementApiResource {
     @Path("{documentId}/attachment")
     @Consumes({ MediaType.APPLICATION_JSON })
     @Produces({ MediaType.APPLICATION_OCTET_STREAM })
-    public Response downloadFile(@PathParam("entityType") final String entityType,
-            @PathParam("entityId") final Long entityId,
+    public Response downloadFile(@PathParam("entityType") final String entityType, @PathParam("entityId") final Long entityId,
             @PathParam("documentId") final Long documentId) {
 
         validateUserHasAccessToEntity(entityType, entityId);
-        
+
         final FileData fileData = this.documentReadPlatformService.retrieveFileData(entityType, entityId, documentId);
         return ContentResources.fileDataToResponse(fileData, "attachment");
     }
@@ -154,8 +147,7 @@ public class SelfServiceDocumentManagementApiResource {
     @Path("{documentId}")
     @Consumes({ MediaType.APPLICATION_JSON })
     @Produces({ MediaType.APPLICATION_JSON })
-    public String deleteDocument(@PathParam("entityType") final String entityType,
-            @PathParam("entityId") final Long entityId,
+    public String deleteDocument(@PathParam("entityType") final String entityType, @PathParam("entityId") final Long entityId,
             @PathParam("documentId") final Long documentId) {
 
         validateUserHasAccessToEntity(entityType, entityId);
@@ -169,7 +161,7 @@ public class SelfServiceDocumentManagementApiResource {
 
     private void validateUserHasAccessToEntity(String entityType, Long entityId) {
         AppUser user = context.authenticatedUser();
-        
+
         if (!user.isSelfServiceUser()) {
             throw new NoAuthorizationException("User is not a self-service user");
         }
@@ -179,11 +171,11 @@ public class SelfServiceDocumentManagementApiResource {
         switch (entityType.toLowerCase()) {
             case "clients":
                 boolean hasAccess = user.getAppUserClientMappings().stream()
-                    .anyMatch(mapping -> mapping.getClient().getId().equals(entityId));
+                        .anyMatch(mapping -> mapping.getClient().getId().equals(entityId));
                 if (!hasAccess) {
                     throw new NoAuthorizationException("User does not have access to this client");
                 }
-                break;
+            break;
             // Add cases for other entity types as needed (loans, savings etc)
             default:
                 throw new NoAuthorizationException("Entity type not supported for self-service: " + entityType);
