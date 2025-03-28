@@ -34,7 +34,6 @@ public class SelfOfficesApiResource {
     private final ApiRequestParameterHelper apiRequestParameterHelper;
 
     @GET
-    @Consumes({ MediaType.APPLICATION_JSON })
     @Produces({ MediaType.APPLICATION_JSON })
     public String retrieveOffices(@Context final UriInfo uriInfo) {
         context.authenticatedUser().validateHasReadPermission("OFFICE");
