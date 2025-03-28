@@ -301,7 +301,7 @@ jib {
         labels = [maintainer: 'Aleksandar Vidakovic <aleks@apache.org>']
         user = 'nobody:nogroup'
         environment = [
-            'JAVA_TOOL_OPTIONS': ''
+            
         ]
     }
 
