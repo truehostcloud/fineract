@@ -25,7 +25,7 @@
     <changeSet author="fineract" id="1">
         <preConditions onFail="MARK_RAN">
             <sqlCheck expectedResult="0">
-                SELECT COUNT(*) FROM m_external_event_configuration 
+                SELECT COUNT(*) FROM m_external_event_configuration
                 WHERE type IN ('DocumentCreateBusinessEvent', 'DocumentDeleteBusinessEvent')
             </sqlCheck>
         </preConditions>
@@ -38,4 +38,4 @@
             <column name="enabled" valueBoolean="true"/>
         </insert>
     </changeSet>
-</databaseChangeLog> 
+</databaseChangeLog>

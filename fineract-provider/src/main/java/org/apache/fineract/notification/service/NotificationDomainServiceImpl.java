@@ -22,10 +22,13 @@ import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.fineract.infrastructure.core.data.CommandProcessingResult;
+import org.apache.fineract.infrastructure.documentmanagement.domain.Document;
 import org.apache.fineract.infrastructure.event.business.BusinessEventListener;
 import org.apache.fineract.infrastructure.event.business.domain.client.ClientCreateBusinessEvent;
 import org.apache.fineract.infrastructure.event.business.domain.deposit.FixedDepositAccountCreateBusinessEvent;
 import org.apache.fineract.infrastructure.event.business.domain.deposit.RecurringDepositAccountCreateBusinessEvent;
+import org.apache.fineract.infrastructure.event.business.domain.document.DocumentCreateBusinessEvent;
+import org.apache.fineract.infrastructure.event.business.domain.document.DocumentDeleteBusinessEvent;
 import org.apache.fineract.infrastructure.event.business.domain.group.CentersCreateBusinessEvent;
 import org.apache.fineract.infrastructure.event.business.domain.group.GroupsCreateBusinessEvent;
 import org.apache.fineract.infrastructure.event.business.domain.loan.LoanApprovedBusinessEvent;
@@ -43,8 +46,6 @@ import org.apache.fineract.infrastructure.event.business.domain.savings.transact
 import org.apache.fineract.infrastructure.event.business.domain.share.ShareAccountApproveBusinessEvent;
 import org.apache.fineract.infrastructure.event.business.domain.share.ShareAccountCreateBusinessEvent;
 import org.apache.fineract.infrastructure.event.business.domain.share.ShareProductDividentsCreateBusinessEvent;
-import org.apache.fineract.infrastructure.event.business.domain.document.DocumentCreateBusinessEvent;
-import org.apache.fineract.infrastructure.event.business.domain.document.DocumentDeleteBusinessEvent;
 import org.apache.fineract.infrastructure.event.business.service.BusinessEventNotifierService;
 import org.apache.fineract.infrastructure.security.service.PlatformSecurityContext;
 import org.apache.fineract.portfolio.client.domain.Client;
@@ -57,7 +58,6 @@ import org.apache.fineract.portfolio.savings.domain.RecurringDepositAccount;
 import org.apache.fineract.portfolio.savings.domain.SavingsAccount;
 import org.apache.fineract.portfolio.savings.domain.SavingsAccountTransaction;
 import org.apache.fineract.portfolio.shareaccounts.domain.ShareAccount;
-import org.apache.fineract.infrastructure.documentmanagement.domain.Document;
 import org.apache.fineract.useradministration.domain.AppUser;
 
 @RequiredArgsConstructor
@@ -320,46 +320,30 @@ public class NotificationDomainServiceImpl implements NotificationDomainService 
     }
 
     private final class DocumentCreatedListener implements BusinessEventListener<DocumentCreateBusinessEvent> {
+
         @Override
         public void onBusinessEvent(DocumentCreateBusinessEvent event) {
             Document document = event.get();
 
             AppUser creator = context.authenticatedUser();
 
-            String notificationMessage = String.format(
-                "%s uploaded a new document [%s]",
-                 creator.getDisplayName(),
-                 document.getName()
-            );
+            String notificationMessage = String.format("%s uploaded a new document [%s]", creator.getDisplayName(), document.getName());
 
-            buildNotification("READ_DOCUMENT", 
-                document.getParentEntityType(), 
-                document.getParentEntityId(),
-                notificationMessage,
-                "created",
-                creator.getId(),
-                creator.getOffice().getId());
+            buildNotification("READ_DOCUMENT", document.getParentEntityType(), document.getParentEntityId(), notificationMessage, "created",
+                    creator.getId(), creator.getOffice().getId());
         }
     }
 
     private final class DocumentDeletedListener implements BusinessEventListener<DocumentDeleteBusinessEvent> {
+
         @Override
         public void onBusinessEvent(DocumentDeleteBusinessEvent event) {
             Document document = event.get();
             AppUser deleter = context.authenticatedUser();
 
-            String notificationMessage = String.format(
-                "%s deleted a document [%s]",
-                deleter.getDisplayName(),
-                document.getName()
-            );
-            buildNotification("READ_DOCUMENT", 
-                document.getParentEntityType(), 
-                document.getParentEntityId(),
-                notificationMessage,
-                "deleted",
-                deleter.getId(),
-                deleter.getOffice().getId());
+            String notificationMessage = String.format("%s deleted a document [%s]", deleter.getDisplayName(), document.getName());
+            buildNotification("READ_DOCUMENT", document.getParentEntityType(), document.getParentEntityId(), notificationMessage, "deleted",
+                    deleter.getId(), deleter.getOffice().getId());
         }
     }
 

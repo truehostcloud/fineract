@@ -98,7 +98,8 @@ public class ScorecardReadPlatformServiceImpl implements ScorecardReadPlatformSe
     Collection<ScorecardData> updateScorecardValues(Collection<ScorecardData> scorecard) {
         for (ScorecardData scorecardData : scorecard) {
             if (scorecardData.getId() != null) {
-                scorecardData.setScorecardValues(getScorecardValueBySurveyAndClient(scorecardData.getSurveyId(), scorecardData.getClientId(), scorecardData.getId()));
+                scorecardData.setScorecardValues(getScorecardValueBySurveyAndClient(scorecardData.getSurveyId(),
+                        scorecardData.getClientId(), scorecardData.getId()));
             }
         }
         return scorecard;

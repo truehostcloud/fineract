@@ -4,6 +4,7 @@ import org.apache.fineract.infrastructure.documentmanagement.domain.Document;
 import org.apache.fineract.infrastructure.event.business.domain.AbstractBusinessEvent;
 
 public abstract class DocumentBusinessEvent extends AbstractBusinessEvent<Document> {
+
     private static final String CATEGORY = "Document";
 
     public DocumentBusinessEvent(Document value) {
@@ -19,4 +20,4 @@ public abstract class DocumentBusinessEvent extends AbstractBusinessEvent<Docume
     public Long getAggregateRootId() {
         return get().getId();
     }
-} 
+}
