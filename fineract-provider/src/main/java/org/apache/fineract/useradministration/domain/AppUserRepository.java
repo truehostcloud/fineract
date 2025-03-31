@@ -31,4 +31,10 @@ public interface AppUserRepository extends JpaRepository<AppUser, Long>, JpaSpec
     AppUser findAppUserByName(@Param("username") String username);
 
     Collection<AppUser> findByOfficeId(Long officeId);
+
+    @Query("Select appUser from AppUser appUser where appUser.email = :email")
+    AppUser findByEmail(@Param("email") String email);
+
+    @Query("Select appUser from AppUser appUser where appUser.passwordResetToken = :token")
+    AppUser findByPasswordResetToken(@Param("token") String token);
 }
