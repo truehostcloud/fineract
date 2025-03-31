@@ -16,15 +16,24 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.fineract.portfolio.address.data;
+package org.apache.fineract.portfolio.delinquency.api;
 
 import java.io.Serial;
 import java.io.Serializable;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 
-public record FieldConfigurationData(Long fieldConfigurationId, String entity, String subentity, String field, boolean isEnabled,
-        boolean isMandatory, String validationRegex) implements Serializable {
+@Setter
+@Getter
+@NoArgsConstructor
+public class DelinquencyRangeRequest implements Serializable {
 
     @Serial
     private static final long serialVersionUID = 1L;
 
+    private String classification;
+    private Integer minimumAgeDays;
+    private Integer maximumAgeDays;
+    private String locale;
 }

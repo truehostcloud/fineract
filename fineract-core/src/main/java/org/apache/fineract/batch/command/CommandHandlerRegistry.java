@@ -16,15 +16,25 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.fineract.portfolio.address.data;
+package org.apache.fineract.batch.command;
 
-import java.io.Serial;
-import java.io.Serializable;
+import java.util.Map;
+import java.util.function.BiFunction;
+import lombok.RequiredArgsConstructor;
 
-public record FieldConfigurationData(Long fieldConfigurationId, String entity, String subentity, String field, boolean isEnabled,
-        boolean isMandatory, String validationRegex) implements Serializable {
+@RequiredArgsConstructor
+public final class CommandHandlerRegistry<K, P1, P2, R> {
 
-    @Serial
-    private static final long serialVersionUID = 1L;
+    private final Map<K, BiFunction<P1, P2, R>> handlers;
 
+    public void register(K key, BiFunction<P1, P2, R> handler) {
+        handlers.put(key, handler);
+    }
+
+    public R execute(K key, P1 param1, P2 param2, RuntimeException ex) {
+        return handlers.getOrDefault(key, (p1, p2) -> {
+            throw ex;
+        }).apply(param1, param2);
+
+    }
 }

@@ -16,15 +16,31 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.fineract.portfolio.address.data;
+package org.apache.fineract.portfolio.account.data.request;
 
 import java.io.Serial;
 import java.io.Serializable;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
-public record FieldConfigurationData(Long fieldConfigurationId, String entity, String subentity, String field, boolean isEnabled,
-        boolean isMandatory, String validationRegex) implements Serializable {
+@Data
+@NoArgsConstructor
+public class AccountTransferRequest implements Serializable {
 
     @Serial
     private static final long serialVersionUID = 1L;
 
+    private String transferDescription;
+    private String toOfficeId;
+    private String toAccountType;
+    private String dateFormat;
+    private String transferAmount;
+    private String toAccountId;
+    private String fromClientId;
+    private String locale;
+    private String transferDate;
+    private String fromAccountType;
+    private String toClientId;
+    private String fromAccountId;
+    private String fromOfficeId;
 }

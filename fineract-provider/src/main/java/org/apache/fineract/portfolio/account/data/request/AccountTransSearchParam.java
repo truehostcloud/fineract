@@ -16,15 +16,37 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.fineract.portfolio.address.data;
+package org.apache.fineract.portfolio.account.data.request;
 
+import jakarta.ws.rs.QueryParam;
 import java.io.Serial;
 import java.io.Serializable;
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
-public record FieldConfigurationData(Long fieldConfigurationId, String entity, String subentity, String field, boolean isEnabled,
-        boolean isMandatory, String validationRegex) implements Serializable {
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+public class AccountTransSearchParam implements Serializable {
 
     @Serial
     private static final long serialVersionUID = 1L;
 
+    @QueryParam("fromOfficeId")
+    private Long fromOfficeId;
+    @QueryParam("fromClientId")
+    private Long fromClientId;
+    @QueryParam("fromAccountId")
+    private Long fromAccountId;
+    @QueryParam("fromAccountType")
+    private Integer fromAccountType;
+    @QueryParam("toOfficeId")
+    private Long toOfficeId;
+    @QueryParam("toClientId")
+    private Long toClientId;
+    @QueryParam("toAccountId")
+    private Long toAccountId;
+    @QueryParam("toAccountType")
+    private Integer toAccountType;
 }
