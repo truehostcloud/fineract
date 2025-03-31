@@ -122,6 +122,16 @@ public class AppUser extends AbstractPersistableCustom<Long> implements Platform
     @Column(name = "cannot_change_password", nullable = true)
     private Boolean cannotChangePassword;
 
+    @Getter
+    @Setter
+    @Column(name = "password_reset_token", length = 100, nullable = true)
+    private String passwordResetToken;
+
+    @Getter
+    @Setter
+    @Column(name = "password_reset_token_expiry", nullable = true)
+    private LocalDateTime passwordResetTokenExpiry;
+
     public static AppUser fromJson(final Office userOffice, final Staff linkedStaff, final Set<Role> allRoles,
             final Collection<Client> clients, final JsonCommand command) {
 
