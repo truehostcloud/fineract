@@ -14,6 +14,10 @@ import jakarta.ws.rs.POST;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.core.MediaType;
+import java.lang.reflect.Type;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.fineract.infrastructure.core.api.JsonCommand;
@@ -23,11 +27,6 @@ import org.apache.fineract.infrastructure.core.serialization.FromJsonHelper;
 import org.apache.fineract.infrastructure.core.serialization.ToApiJsonSerializer;
 import org.apache.fineract.portfolio.self.security.service.SelfServicePasswordResetWritePlatformService;
 import org.springframework.stereotype.Component;
-
-import java.lang.reflect.Type;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Set;
 
 @Path("/v1/self/password")
 @Component
@@ -81,4 +80,4 @@ public class SelfServicePasswordResetApiResource {
         final CommandProcessingResult result = this.selfServicePasswordResetWritePlatformService.verifyAndUpdatePassword(command);
         return this.toApiJsonSerializer.serialize(result);
     }
-} 
+}

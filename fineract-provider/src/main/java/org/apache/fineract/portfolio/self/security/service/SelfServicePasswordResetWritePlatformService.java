@@ -8,4 +8,4 @@ public interface SelfServicePasswordResetWritePlatformService {
     CommandProcessingResult requestPasswordReset(JsonCommand command);
 
     CommandProcessingResult verifyAndUpdatePassword(JsonCommand command);
-} 
+}

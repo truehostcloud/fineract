@@ -1,5 +1,9 @@
 package org.apache.fineract.portfolio.self.security.service;
 
+import java.security.SecureRandom;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.apache.fineract.infrastructure.core.api.JsonCommand;
 import org.apache.fineract.infrastructure.core.data.ApiParameterError;
@@ -18,11 +22,6 @@ import org.apache.fineract.useradministration.domain.PasswordValidationPolicyRep
 import org.apache.fineract.useradministration.exception.UserNotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.security.SecureRandom;
-import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -48,7 +47,7 @@ public class SelfServicePasswordResetWritePlatformServiceImpl implements SelfSer
         }
 
         AppUser user = this.appUserRepository.findByEmail(email);
-        
+
         if (user != null && user.isSelfServiceUser()) {
             String resetToken = generateResetToken();
             user.setPasswordResetToken(resetToken);
@@ -57,9 +56,7 @@ public class SelfServicePasswordResetWritePlatformServiceImpl implements SelfSer
 
             sendPasswordResetEmail(user, resetToken);
         }
-        return new CommandProcessingResultBuilder()
-                .withCommandId(command.commandId())
-                .build();
+        return new CommandProcessingResultBuilder().withCommandId(command.commandId()).build();
     }
 
     @Override
@@ -85,15 +82,14 @@ public class SelfServicePasswordResetWritePlatformServiceImpl implements SelfSer
 
         if (user.getPasswordResetTokenExpiry().isBefore(LocalDateTime.now())) {
             final List<ApiParameterError> errors = new ArrayList<>();
-            errors.add(ApiParameterError.parameterError("error.msg.password.reset.token.expired", "Password reset token has expired", "token"));
+            errors.add(ApiParameterError.parameterError("error.msg.password.reset.token.expired", "Password reset token has expired",
+                    "token"));
             throw new PlatformApiDataValidationException(errors);
         }
 
         validatePassword(newPassword);
 
-        PlatformUser platformUser = new BasicPasswordEncodablePlatformUser()
-                .setId(user.getId())
-                .setUsername(user.getUsername())
+        PlatformUser platformUser = new BasicPasswordEncodablePlatformUser().setId(user.getId()).setUsername(user.getUsername())
                 .setPassword(newPassword);
         String encodedPassword = this.platformPasswordEncoder.encode(platformUser);
         user.updatePassword(encodedPassword);
@@ -101,17 +97,14 @@ public class SelfServicePasswordResetWritePlatformServiceImpl implements SelfSer
         user.setPasswordResetTokenExpiry(null);
         this.appUserRepository.save(user);
 
-        return new CommandProcessingResultBuilder()
-                .withCommandId(command.commandId())
-                .withEntityId(user.getId())
-                .build();
+        return new CommandProcessingResultBuilder().withCommandId(command.commandId()).withEntityId(user.getId()).build();
     }
 
     private void validatePassword(String password) {
         final PasswordValidationPolicy validationPolicy = this.passwordValidationPolicyRepository.findActivePasswordValidationPolicy();
         final String regex = validationPolicy.getRegex();
         final String description = validationPolicy.getDescription();
-        
+
         if (!password.matches(regex)) {
             final List<ApiParameterError> errors = new ArrayList<>();
             errors.add(ApiParameterError.parameterError("error.msg.password.does.not.match.policy", description, "newPassword"));
@@ -127,9 +120,11 @@ public class SelfServicePasswordResetWritePlatformServiceImpl implements SelfSer
 
     private void sendPasswordResetEmail(AppUser user, String resetToken) {
         final String subject = "Password Reset Request";
-        final String body = String.format("Dear %s,\n\nYou have requested to reset your password. Please use the following token to reset your password:\n\n%s\n\nThis token will expire in 24 hours.\n\nIf you did not request this password reset, please ignore this email.\n\nBest regards,\nJisort Team",
+        final String body = String.format(
+                "Dear %s,\n\nYou have requested to reset your password. Please use the following token to reset your password:\n\n%s\n\nThis token will expire in 24 hours.\n\nIf you did not request this password reset, please ignore this email.\n\nBest regards,\nJisort Team",
                 user.getFirstname(), resetToken);
 
-        this.gmailBackedPlatformEmailService.sendDefinedEmail(new org.apache.fineract.infrastructure.core.domain.EmailDetail(subject, body, user.getEmail(), user.getFirstname()));
+        this.gmailBackedPlatformEmailService.sendDefinedEmail(
+                new org.apache.fineract.infrastructure.core.domain.EmailDetail(subject, body, user.getEmail(), user.getFirstname()));
     }
-} 
+}
