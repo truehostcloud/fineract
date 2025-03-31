@@ -129,6 +129,8 @@ public class SecurityConfig {
                             .requestMatchers(antMatcher(HttpMethod.POST, "/api/*/self/authentication")).permitAll() //
                             .requestMatchers(antMatcher(HttpMethod.POST, "/api/*/self/registration")).permitAll() //
                             .requestMatchers(antMatcher(HttpMethod.POST, "/api/*/self/registration/user")).permitAll() //
+                            .requestMatchers(antMatcher(HttpMethod.POST, "/api/*/self/password/reset")).permitAll() //
+                            .requestMatchers(antMatcher(HttpMethod.POST, "/api/*/self/password/verify")).permitAll() //
                             .requestMatchers(antMatcher(HttpMethod.PUT, "/api/*/instance-mode")).permitAll() //
                             .requestMatchers(antMatcher(HttpMethod.POST, "/api/*/twofactor/validate")).fullyAuthenticated() //
                             .requestMatchers(antMatcher("/api/*/twofactor")).fullyAuthenticated() //
