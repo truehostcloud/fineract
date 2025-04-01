@@ -97,7 +97,12 @@ public class SelfServicePasswordResetWritePlatformServiceImpl implements SelfSer
         user.setPasswordResetTokenExpiry(null);
         this.appUserRepository.save(user);
 
-        return new CommandProcessingResultBuilder().withCommandId(command.commandId()).withEntityId(user.getId()).build();
+        sendPasswordResetConfirmationEmail(user, command);
+
+        return new CommandProcessingResultBuilder()
+                .withCommandId(command.commandId())
+                .withEntityId(user.getId())
+                .build();
     }
 
     private void validatePassword(String password) {
