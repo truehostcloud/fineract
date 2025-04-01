@@ -127,4 +127,14 @@ public class SelfServicePasswordResetWritePlatformServiceImpl implements SelfSer
         this.gmailBackedPlatformEmailService.sendDefinedEmail(
                 new org.apache.fineract.infrastructure.core.domain.EmailDetail(subject, body, user.getEmail(), user.getFirstname()));
     }
+
+    private void sendPasswordResetConfirmationEmail(AppUser user, JsonCommand command) {
+        final String subject = "Password Reset Successful";
+        final String body = String.format(
+                "Dear %s,\n\nYour password has been successfully reset. Here are your login details:\n\nUsername: %s\nPassword: %s\n\nYou must change this password upon first log in using Uppercase, Lowercase, number and character.\n\nIf you did not perform this action, please contact your system administrator immediately.\n\nBest regards,\nJisort Team",
+                user.getFirstname(), user.getUsername(), command.stringValueOfParameterNamed("newPassword"));
+
+        this.gmailBackedPlatformEmailService.sendDefinedEmail(
+                new org.apache.fineract.infrastructure.core.domain.EmailDetail(subject, body, user.getEmail(), user.getFirstname()));
+    }
 }
