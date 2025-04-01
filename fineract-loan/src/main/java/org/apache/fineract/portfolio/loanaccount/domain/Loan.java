@@ -3529,7 +3529,8 @@ public class Loan extends AbstractAuditableWithUTCDateTimeCustom<Long> {
 
     public boolean hasMonetaryActivityAfter(final LocalDate transactionDate) {
         for (LoanTransaction transaction : this.getLoanTransactions()) {
-            if (transaction.getTransactionDate().isAfter(transactionDate) && !transaction.isNonMonetaryTransaction()) {
+            if (transaction.getTransactionDate().isAfter(transactionDate) && transaction.isNotReversed()
+                    && !transaction.isNonMonetaryTransaction()) {
                 return true;
             }
         }
