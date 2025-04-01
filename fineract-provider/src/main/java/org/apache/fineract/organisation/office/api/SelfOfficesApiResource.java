@@ -1,6 +1,5 @@
 package org.apache.fineract.organisation.office.api;
 
-import jakarta.ws.rs.Consumes;
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.Produces;
@@ -41,4 +40,4 @@ public class SelfOfficesApiResource {
         final ApiRequestJsonSerializationSettings settings = apiRequestParameterHelper.process(uriInfo.getQueryParameters());
         return toApiJsonSerializer.serialize(settings, offices, RESPONSE_DATA_PARAMETERS);
     }
-} 
+}
