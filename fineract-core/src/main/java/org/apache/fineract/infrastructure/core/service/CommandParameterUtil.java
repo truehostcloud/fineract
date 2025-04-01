@@ -22,6 +22,11 @@ import org.apache.commons.lang3.StringUtils;
 
 public final class CommandParameterUtil {
 
+    public static final String INTERMEDIARY_SALE_COMMAND_VALUE = "intermediarySale";
+    public static final String SALE_COMMAND_VALUE = "sale";
+    public static final String BUY_BACK_COMMAND_VALUE = "buyback";
+    public static final String CANCEL_COMMAND_VALUE = "cancel";
+
     private CommandParameterUtil() {}
 
     public static boolean is(final String commandParam, final String commandValue) {
