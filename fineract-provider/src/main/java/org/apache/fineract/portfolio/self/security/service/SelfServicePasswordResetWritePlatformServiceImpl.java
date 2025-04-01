@@ -123,7 +123,7 @@ public class SelfServicePasswordResetWritePlatformServiceImpl implements SelfSer
     private void sendPasswordResetEmail(AppUser user, String resetToken) {
         final String subject = "Password Reset Request";
         final String body = String.format(
-                "Dear %s,\n\nYou have requested to reset your password. Please use the following token to reset your password:\n\n%s\n\nThis token will expire in 24 hours.\n\nIf you did not request this password reset, please ignore this email.\n\nBest regards,\nJisort Team",
+                "Dear %s,\n\nYou have requested to reset your password. Please use the following token to reset your password:\n\n%s\n\nThis token will expire in 24 hours.\n\nIf you did not request this password reset, please ignore this email.\n\nBest regards,\nMifos Team",
                 user.getFirstname(), resetToken);
 
         this.gmailBackedPlatformEmailService.sendDefinedEmail(
@@ -133,7 +133,7 @@ public class SelfServicePasswordResetWritePlatformServiceImpl implements SelfSer
     private void sendPasswordResetConfirmationEmail(AppUser user, JsonCommand command) {
         final String subject = "Password Reset Successful";
         final String body = String.format(
-                "Dear %s,\n\nYour password has been successfully reset. Here are your login details:\n\nUsername: %s\nPassword: %s\n\nYou must change this password upon first log in using Uppercase, Lowercase, number and character.\n\nIf you did not perform this action, please contact your system administrator immediately.\n\nBest regards,\nJisort Team",
+                "Dear %s,\n\nYour password has been successfully reset. Here are your login details:\n\nUsername: %s\nPassword: %s\n\nYou must change this password upon first log in using Uppercase, Lowercase, number and character.\n\nIf you did not perform this action, please contact your system administrator immediately.\n\nBest regards,\nMifos Team",
                 user.getFirstname(), user.getUsername(), command.stringValueOfParameterNamed("newPassword"));
 
         this.gmailBackedPlatformEmailService.sendDefinedEmail(
