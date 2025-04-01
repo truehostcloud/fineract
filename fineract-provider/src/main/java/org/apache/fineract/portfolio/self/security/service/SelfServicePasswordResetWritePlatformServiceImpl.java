@@ -99,10 +99,7 @@ public class SelfServicePasswordResetWritePlatformServiceImpl implements SelfSer
 
         sendPasswordResetConfirmationEmail(user, command);
 
-        return new CommandProcessingResultBuilder()
-                .withCommandId(command.commandId())
-                .withEntityId(user.getId())
-                .build();
+        return new CommandProcessingResultBuilder().withCommandId(command.commandId()).withEntityId(user.getId()).build();
     }
 
     private void validatePassword(String password) {
