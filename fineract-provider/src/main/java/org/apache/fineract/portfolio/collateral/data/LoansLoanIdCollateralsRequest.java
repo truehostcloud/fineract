@@ -16,16 +16,21 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.fineract.organisation.monetary.service;
+package org.apache.fineract.portfolio.collateral.data;
 
-import java.util.List;
-import org.apache.fineract.organisation.monetary.data.CurrencyData;
+import java.io.Serial;
+import java.io.Serializable;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 
-public interface CurrencyReadPlatformService {
+@Getter
+@Setter
+@NoArgsConstructor
+public class LoansLoanIdCollateralsRequest implements Serializable {
 
-    List<CurrencyData> retrieveAllowedCurrencies();
+    @Serial
+    private static final long serialVersionUID = 1L;
 
-    List<CurrencyData> retrieveAllPlatformCurrencies();
-
-    CurrencyData retrieveCurrency(String code);
+    private Long collateralTypeId;
 }
