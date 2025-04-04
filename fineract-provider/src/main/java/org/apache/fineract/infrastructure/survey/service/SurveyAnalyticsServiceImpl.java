@@ -2,18 +2,17 @@ package org.apache.fineract.infrastructure.survey.service;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.fineract.infrastructure.core.exception.PlatformServiceUnavailableException;
-import org.apache.fineract.infrastructure.core.service.database.DatabaseSpecificSQLGenerator;
-import org.apache.fineract.infrastructure.security.service.PlatformSecurityContext;
-import org.apache.fineract.infrastructure.survey.data.*;
-import org.apache.fineract.infrastructure.survey.exception.SurveyNotFoundException;
+import org.apache.fineract.infrastructure.survey.data.SurveyResponseAnalyticsData;
+import org.apache.fineract.spm.exception.SurveyNotFoundException;
 import org.springframework.dao.DataAccessException;
-import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.jdbc.core.RowMapper;
+import org.springframework.dao.EmptyResultDataAccessException;
+import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
+import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.util.StringUtils;
+import org.springframework.util.CollectionUtils;
 
+import java.sql.Date;
 import java.time.LocalDate;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -23,401 +22,289 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class SurveyAnalyticsServiceImpl implements SurveyAnalyticsService {
 
-    private static final String SURVEY_TABLE = "m_surveys";
-    private static final String SCORECARD_TABLE = "m_survey_scorecards";
-    private static final String QUESTION_TABLE = "m_survey_questions";
-    private static final String RESPONSE_TABLE = "m_survey_responses";
-    private static final String CLIENT_TABLE = "m_client";
+    private final NamedParameterJdbcTemplate namedParameterJdbcTemplate;
 
-    private final PlatformSecurityContext context;
-    private final JdbcTemplate jdbcTemplate;
-    private final DatabaseSpecificSQLGenerator sqlGenerator;
+    
+    private static final String SURVEY_AND_QUESTIONS_QUERY = """
+            SELECT s.id as survey_id, s.a_name as survey_name, s.description as survey_description,
+                   s.country_code, s.valid_from, s.valid_to,
+                   q.id as question_id, q.a_text as question_text, q.description as question_description,
+                   q.a_key as `key`, q.sequence_no
+            FROM m_surveys s
+            JOIN m_survey_questions q ON s.id = q.survey_id
+            WHERE s.a_name = :surveyName
+            ORDER BY q.sequence_no
+            """;
 
-    private static final RowMapper<Map<String, Integer>> RESPONSE_DISTRIBUTION_MAPPER = (rs, rowNum) -> {
-        Map<String, Integer> distribution = new HashMap<>();
-        distribution.put(rs.getString("a_text"), rs.getInt("count"));
-        return distribution;
-    };
+    
+    private static final String RESPONSES_QUERY = """
+            SELECT r.id as response_id, r.question_id, r.a_text as response_text, r.sequence_no
+            FROM m_survey_responses r
+            WHERE r.question_id IN (:questionIds)
+            ORDER BY r.sequence_no
+            """;
 
-    private static final RowMapper<DemographicStats> DEMOGRAPHIC_STATS_MAPPER = (rs, rowNum) -> new DemographicStats()
-            .setDemographicValue(rs.getString("field_value"))
-            .setResponseCount(rs.getInt("response_count"))
-            .setAverageScore(rs.getDouble("avg_score"));
+    
+    private static final String RESPONSE_STATS_QUERY = """
+             WITH response_counts AS (
+                 SELECT\s
+                     sc.question_id,
+                     sc.response_id,
+                     COUNT(DISTINCT sc.client_id) as unique_clients,
+                     COUNT(*) as total_responses
+                 FROM m_survey_scorecards sc
+                 WHERE sc.survey_id = :surveyId
+                     AND (:startDate IS NULL OR sc.created_on >= :startDate)
+                     AND (:endDate IS NULL OR sc.created_on <= :endDate)
+                 GROUP BY sc.question_id, sc.response_id
+             ),
+             question_totals AS (
+                 SELECT\s
+                     question_id,
+                     SUM(total_responses) as question_total
+                 FROM response_counts
+                 GROUP BY question_id
+             )
+             SELECT\s
+                 rc.question_id,
+                 rc.response_id,
+                 rc.unique_clients,
+                 rc.total_responses,
+                 ROUND((rc.total_responses * 100.0) / qt.question_total, 2) as percentage
+             FROM response_counts rc
+             JOIN question_totals qt ON rc.question_id = qt.question_id
+            \s""";
 
-    private static final RowMapper<TimeSeriesData> TIME_SERIES_DATA_MAPPER = (rs, rowNum) -> new TimeSeriesData()
-            .setDate(rs.getDate("date").toLocalDate())
-            .setResponseCount(rs.getInt("response_count"))
-            .setAverageScore(rs.getDouble("avg_score"));
+    
+    private static final String NULL_RESPONSES_QUERY = """
+            SELECT\s
+                question_id,
+                COUNT(DISTINCT client_id) as unique_clients,
+                COUNT(*) as total_responses
+            FROM m_survey_scorecards
+            WHERE survey_id = :surveyId
+                AND response_id IS NULL
+                AND (:startDate IS NULL OR created_on >= :startDate)
+                AND (:endDate IS NULL OR created_on <= :endDate)
+            GROUP BY question_id
+           \s""";
+
+    
+    private static final String TOTAL_UNIQUE_CLIENTS_QUERY = """
+            SELECT COUNT(DISTINCT client_id) as total
+            FROM m_survey_scorecards
+            WHERE survey_id = :surveyId
+                AND (:startDate IS NULL OR created_on >= :startDate)
+                AND (:endDate IS NULL OR created_on <= :endDate)
+            """;
 
     @Override
     @Transactional(readOnly = true)
-    public SurveyAnalyticsData getSurveyAnalytics(String surveyName, LocalDate startDate, LocalDate endDate) {
-        validateInput(surveyName, startDate, endDate);
-        context.authenticatedUser().validateHasDatatableReadPermission(surveyName);
+    public SurveyResponseAnalyticsData getSurveyResponseAnalytics(String surveyName, LocalDate startDate, LocalDate endDate) {
+        if (surveyName == null || surveyName.isBlank()) {
+            throw new IllegalArgumentException("Survey name cannot be null or empty");
+        }
 
-        SurveyAnalyticsData analytics = new SurveyAnalyticsData()
+        
+        final SurveyResponseAnalyticsData analytics = new SurveyResponseAnalyticsData()
                 .setSurveyName(surveyName)
                 .setStartDate(startDate)
                 .setEndDate(endDate);
 
         try {
-            // Get survey ID
-            Long surveyId = getSurveyId(surveyName);
-            if (surveyId == null) {
+            
+            MapSqlParameterSource surveyParams = new MapSqlParameterSource("surveyName", surveyName);
+            List<Map<String, Object>> surveyAndQuestions = namedParameterJdbcTemplate.queryForList(
+                    SURVEY_AND_QUESTIONS_QUERY, surveyParams);
+
+            if (CollectionUtils.isEmpty(surveyAndQuestions)) {
                 throw new SurveyNotFoundException(surveyName);
             }
 
-            // Get questions and their responses
-            List<Map<String, Object>> questions = getQuestions(surveyId);
-            Map<String, QuestionAnalytics> questionAnalytics = new HashMap<>();
+            
+            Map<String, Object> firstRow = surveyAndQuestions.get(0);
+            Long surveyId = getLongValue(firstRow);
 
-            for (Map<String, Object> question : questions) {
-                Long questionId = (Long) question.get("id");
-                String questionText = (String) question.get("a_text");
-                String questionKey = (String) question.get("a_key");
+            
+            validateDates(startDate, endDate, firstRow);
 
-                QuestionAnalytics qa = new QuestionAnalytics()
+            
+            MapSqlParameterSource totalParams = new MapSqlParameterSource()
+                    .addValue("surveyId", surveyId)
+                    .addValue("startDate", startDate != null ? Date.valueOf(startDate) : null)
+                    .addValue("endDate", endDate != null ? Date.valueOf(endDate) : null);
+
+            Integer totalClients = queryForIntSafely(totalParams);
+            analytics.setTotalResponses(totalClients);
+
+            
+            List<String> questionIds = surveyAndQuestions.stream()
+                    .map(row -> String.valueOf(row.get("question_id")))
+                    .collect(Collectors.toList());
+
+            
+            MapSqlParameterSource responsesParams = new MapSqlParameterSource("questionIds", questionIds);
+            List<Map<String, Object>> responses = namedParameterJdbcTemplate.queryForList(
+                    RESPONSES_QUERY, responsesParams);
+
+            
+            Map<String, List<Map<String, Object>>> responsesByQuestion = responses.stream()
+                    .collect(Collectors.groupingBy(row -> String.valueOf(row.get("question_id"))));
+
+            
+            MapSqlParameterSource statsParams = new MapSqlParameterSource()
+                    .addValue("surveyId", surveyId)
+                    .addValue("startDate", startDate != null ? Date.valueOf(startDate) : null)
+                    .addValue("endDate", endDate != null ? Date.valueOf(endDate) : null);
+
+            List<Map<String, Object>> responseStats = namedParameterJdbcTemplate.queryForList(
+                    RESPONSE_STATS_QUERY, statsParams);
+
+            
+            List<Map<String, Object>> nullResponses = namedParameterJdbcTemplate.queryForList(
+                    NULL_RESPONSES_QUERY, statsParams);
+
+            
+            Map<String, Map<String, Map<String, Object>>> statsByQuestionAndResponse = new HashMap<>();
+
+            for (Map<String, Object> stat : responseStats) {
+                String qId = String.valueOf(stat.get("question_id"));
+                String rId = stat.get("response_id") != null ? String.valueOf(stat.get("response_id")) : "null";
+
+                statsByQuestionAndResponse
+                        .computeIfAbsent(qId, k -> new HashMap<>())
+                        .put(rId, stat);
+            }
+
+            
+            for (Map<String, Object> nullStat : nullResponses) {
+                String qId = String.valueOf(nullStat.get("question_id"));
+
+                statsByQuestionAndResponse
+                        .computeIfAbsent(qId, k -> new HashMap<>())
+                        .put("null", nullStat);
+            }
+
+            
+            List<SurveyResponseAnalyticsData.QuestionAnalytics> questionAnalytics = new ArrayList<>();
+
+            for (Map<String, Object> question : surveyAndQuestions) {
+                String questionId = String.valueOf(question.get("question_id"));
+                String questionText = (String) question.get("question_text");
+                String questionKey = (String) question.get("key");
+
+                SurveyResponseAnalyticsData.QuestionAnalytics qAnalytics = new SurveyResponseAnalyticsData.QuestionAnalytics()
                         .setQuestionCode(questionKey)
                         .setQuestionText(questionText);
 
-                // Get response distribution
-                Map<String, Integer> distribution = getResponseDistribution(surveyId, questionId, startDate, endDate);
-                qa.setAnswerDistribution(distribution);
+                List<SurveyResponseAnalyticsData.QuestionAnalytics.ChoiceAnalytics> choices = new ArrayList<>();
 
-                // Calculate average score for this question
-                double avgScore = calculateQuestionAverageScore(surveyId, questionId, startDate, endDate);
-                qa.setAverageScore(avgScore);
+                
+                List<Map<String, Object>> questionResponses = responsesByQuestion.getOrDefault(questionId, Collections.emptyList());
+                Map<String, Map<String, Object>> questionStats = statsByQuestionAndResponse.getOrDefault(questionId, Collections.emptyMap());
 
-                questionAnalytics.put(questionKey, qa);
+                for (Map<String, Object> response : questionResponses) {
+                    String responseId = String.valueOf(response.get("response_id"));
+                    String responseText = (String) response.get("response_text");
+
+                    Map<String, Object> stats = questionStats.get(responseId);
+                    int count = stats != null ? ((Number) stats.get("total_responses")).intValue() : 0;
+                    double percentage = stats != null ? ((Number) stats.get("percentage")).doubleValue() : 0.0;
+
+                    choices.add(new SurveyResponseAnalyticsData.QuestionAnalytics.ChoiceAnalytics()
+                            .setChoiceText(responseText)
+                            .setCount(count)
+                            .setPercentage(percentage));
+                }
+
+                
+                Map<String, Object> nullStats = questionStats.get("null");
+                if (nullStats != null) {
+                    int nullCount = ((Number) nullStats.get("total_responses")).intValue();
+
+                    
+                    double nullPercentage;
+                    if (nullStats.containsKey("percentage")) {
+                        nullPercentage = ((Number) nullStats.get("percentage")).doubleValue();
+                    } else {
+                        
+                        int totalForQuestion = questionResponses.stream()
+                                .mapToInt(r -> {
+                                    String rId = String.valueOf(r.get("response_id"));
+                                    Map<String, Object> stats = questionStats.get(rId);
+                                    return stats != null ? ((Number) stats.get("total_responses")).intValue() : 0;
+                                })
+                                .sum() + nullCount;
+
+                        nullPercentage = totalForQuestion > 0 ? (double) nullCount / totalForQuestion * 100 : 0.0;
+                    }
+
+                    choices.add(new SurveyResponseAnalyticsData.QuestionAnalytics.ChoiceAnalytics()
+                            .setChoiceText("NULL")
+                            .setCount(nullCount)
+                            .setPercentage(nullPercentage));
+                }
+
+                qAnalytics.setChoices(choices);
+                questionAnalytics.add(qAnalytics);
             }
 
-            analytics.setQuestionAnalytics(questionAnalytics);
-            analytics.setTotalResponses(getTotalResponses(surveyId, startDate, endDate));
-            analytics.setAverageScore(calculateOverallAverageScore(surveyId, startDate, endDate));
-
+            analytics.setQuestions(questionAnalytics);
             return analytics;
+
+        } catch (EmptyResultDataAccessException e) {
+            log.error("Survey not found: {}", surveyName, e);
+            throw new SurveyNotFoundException(surveyName);
         } catch (DataAccessException e) {
-            log.error("Error retrieving survey analytics", e);
-            throw new PlatformServiceUnavailableException("error.msg.survey.analytics.retrieval.failed",
-                    "Failed to retrieve survey analytics for survey: " + surveyName, e);
+            log.error("Database error while fetching survey analytics for survey: {}", surveyName, e);
+            throw new RuntimeException("Error fetching survey analytics: " + e.getMessage(), e);
         }
     }
 
-    private void validateInput(String surveyName, LocalDate startDate, LocalDate endDate) {
-        if (!StringUtils.hasText(surveyName)) {
-            throw new IllegalArgumentException("Survey name cannot be empty");
+    private void validateDates(LocalDate startDate, LocalDate endDate, Map<String, Object> surveyData) {
+        if (startDate != null && endDate != null) {
+            if (startDate.isAfter(endDate)) {
+                throw new IllegalArgumentException("Start date cannot be after end date");
+            }
+
+            LocalDate validFrom = getLocalDateValue(surveyData, "valid_from");
+            LocalDate validTo = getLocalDateValue(surveyData, "valid_to");
+
+            if (validFrom != null && startDate.isBefore(validFrom)) {
+                throw new IllegalArgumentException("Start date cannot be before survey validity period");
+            }
+
+            if (validTo != null && endDate.isAfter(validTo)) {
+                throw new IllegalArgumentException("End date cannot be after survey validity period");
+            }
         }
-        validateDateRange(startDate, endDate);
     }
 
-    private void validateDateRange(LocalDate startDate, LocalDate endDate) {
-        if (startDate == null || endDate == null) {
-            throw new IllegalArgumentException("Start date and end date cannot be null");
-        }
-        if (startDate.isAfter(endDate)) {
-            throw new IllegalArgumentException("Start date cannot be after end date");
-        }
-    }
-
-    private Long getSurveyId(String surveyName) {
-        String sql = String.format("SELECT id FROM %s WHERE a_name = ?",
-                sqlGenerator.escape(SURVEY_TABLE));
-        return jdbcTemplate.queryForObject(sql, Long.class, surveyName);
-    }
-
-    private List<Map<String, Object>> getQuestions(Long surveyId) {
-        String sql = String.format("SELECT id, a_key, a_text FROM %s WHERE survey_id = ? ORDER BY sequence_no",
-                sqlGenerator.escape(QUESTION_TABLE));
-        return jdbcTemplate.queryForList(sql, surveyId);
-    }
-
-    private Map<String, Integer> getResponseDistribution(Long surveyId, Long questionId, LocalDate startDate, LocalDate endDate) {
-        String sql = String.format("""
-                        SELECT sr.a_text, COUNT(sc.id) as count
-                        FROM %s sc
-                        JOIN %s sr ON sc.response_id = sr.id
-                        WHERE sc.survey_id = ? AND sc.question_id = ?
-                        AND sc.created_on BETWEEN ? AND ?
-                        GROUP BY sr.a_text
-                        """,
-                sqlGenerator.escape(SCORECARD_TABLE),
-                sqlGenerator.escape(RESPONSE_TABLE));
-
-        Map<String, Integer> distribution = new HashMap<>();
-        jdbcTemplate.query(sql, RESPONSE_DISTRIBUTION_MAPPER, surveyId, questionId, startDate, endDate)
-                .forEach(distribution::putAll);
-
-        return distribution;
-    }
-
-    private double calculateQuestionAverageScore(Long surveyId, Long questionId, LocalDate startDate, LocalDate endDate) {
-        String sql = String.format("""
-                        SELECT COALESCE(AVG(sc.a_value), 0.0) as avg_score
-                        FROM %s sc
-                        WHERE sc.survey_id = ? AND sc.question_id = ?
-                        AND sc.created_on BETWEEN ? AND ?
-                        """,
-                sqlGenerator.escape(SCORECARD_TABLE));
-        Double result = jdbcTemplate.queryForObject(sql, Double.class, surveyId, questionId, startDate, endDate);
-        return result != null ? result : 0.0;
-    }
-
-    private int getTotalResponses(Long surveyId, LocalDate startDate, LocalDate endDate) {
-        String sql = String.format("""
-                        SELECT COALESCE(COUNT(DISTINCT client_id), 0) 
-                        FROM %s 
-                        WHERE survey_id = ? 
-                        AND created_on BETWEEN ? AND ?
-                        """,
-                sqlGenerator.escape(SCORECARD_TABLE));
-        Integer result = jdbcTemplate.queryForObject(sql, Integer.class, surveyId, startDate, endDate);
-        return result != null ? result : 0;
-    }
-
-    private double calculateOverallAverageScore(Long surveyId, LocalDate startDate, LocalDate endDate) {
-        String sql = String.format("""
-                        SELECT COALESCE(AVG(a_value), 0.0) 
-                        FROM %s 
-                        WHERE survey_id = ? 
-                        AND created_on BETWEEN ? AND ?
-                        """,
-                sqlGenerator.escape(SCORECARD_TABLE));
-        Double result = jdbcTemplate.queryForObject(sql, Double.class, surveyId, startDate, endDate);
-        return result != null ? result : 0.0;
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public SurveyAnalyticsData getSurveyAnalyticsByDemographic(String surveyName, String demographicField, LocalDate startDate, LocalDate endDate) {
-        validateInput(surveyName, startDate, endDate);
-        if (!StringUtils.hasText(demographicField)) {
-            throw new IllegalArgumentException("Demographic field cannot be empty");
-        }
-
-        context.authenticatedUser().validateHasDatatableReadPermission(surveyName);
-
-        SurveyAnalyticsData analytics = new SurveyAnalyticsData()
-                .setSurveyName(surveyName)
-                .setStartDate(startDate)
-                .setEndDate(endDate);
-
+    private Integer queryForIntSafely(MapSqlParameterSource params) {
         try {
-            Long surveyId = getSurveyId(surveyName);
-            if (surveyId == null) {
-                throw new SurveyNotFoundException(surveyName);
-            }
-
-            // Get demographic breakdown
-            Map<String, DemographicBreakdown> demographicBreakdowns = new HashMap<>();
-            DemographicBreakdown breakdown = new DemographicBreakdown()
-                    .setDemographicField(demographicField);
-
-            Map<String, DemographicStats> statsByValue = new HashMap<>();
-
-            String sql = String.format("""
-                            SELECT c.field_value, COUNT(DISTINCT sc.client_id) as response_count, AVG(sc.a_value) as avg_score
-                            FROM %s sc
-                            JOIN %s c ON sc.client_id = c.id
-                            WHERE sc.survey_id = ? AND c.field_name = ?
-                            AND sc.created_on BETWEEN ? AND ?
-                            GROUP BY c.field_value
-                            """,
-                    sqlGenerator.escape(SCORECARD_TABLE),
-                    sqlGenerator.escape(CLIENT_TABLE));
-
-            jdbcTemplate.query(sql, DEMOGRAPHIC_STATS_MAPPER, surveyId, demographicField, startDate, endDate)
-                    .forEach(stats -> statsByValue.put(stats.getDemographicValue(), stats));
-
-            breakdown.setStatsByValue(statsByValue);
-            demographicBreakdowns.put(demographicField, breakdown);
-            analytics.setDemographicBreakdowns(demographicBreakdowns);
-
-            return analytics;
+            return namedParameterJdbcTemplate.queryForObject(SurveyAnalyticsServiceImpl.TOTAL_UNIQUE_CLIENTS_QUERY, params, Integer.class);
         } catch (DataAccessException e) {
-            log.error("Error retrieving demographic analytics", e);
-            throw new PlatformServiceUnavailableException("error.msg.survey.demographic.analytics.retrieval.failed",
-                    "Failed to retrieve demographic analytics for survey: " + surveyName, e);
+            log.warn("Error querying for int with SQL: {}, params: {}", SurveyAnalyticsServiceImpl.TOTAL_UNIQUE_CLIENTS_QUERY, params, e);
+            return 0;
         }
     }
 
-    @Override
-    @Transactional(readOnly = true)
-    public SurveyAnalyticsData getTimeSeriesAnalytics(String surveyName, LocalDate startDate, LocalDate endDate, String timeUnit) {
-        validateInput(surveyName, startDate, endDate);
-        if (!StringUtils.hasText(timeUnit)) {
-            throw new IllegalArgumentException("Time unit cannot be empty");
+    private Long getLongValue(Map<String, Object> data) {
+        if (data == null || !data.containsKey("survey_id") || data.get("survey_id") == null) {
+            return null;
         }
-
-        context.authenticatedUser().validateHasDatatableReadPermission(surveyName);
-
-        SurveyAnalyticsData analytics = new SurveyAnalyticsData()
-                .setSurveyName(surveyName)
-                .setStartDate(startDate)
-                .setEndDate(endDate);
-
-        try {
-            Long surveyId = getSurveyId(surveyName);
-            if (surveyId == null) {
-                throw new SurveyNotFoundException(surveyName);
-            }
-
-            String sql = String.format("""
-                            SELECT DATE(sc.created_on) as date,
-                                   COUNT(DISTINCT sc.client_id) as response_count,
-                                   AVG(sc.a_value) as avg_score
-                            FROM %s sc
-                            WHERE sc.survey_id = ? AND sc.created_on BETWEEN ? AND ?
-                            GROUP BY DATE(sc.created_on)
-                            ORDER BY date
-                            """,
-                    sqlGenerator.escape(SCORECARD_TABLE));
-
-            List<TimeSeriesData> timeSeriesData = new ArrayList<>(jdbcTemplate.query(sql, TIME_SERIES_DATA_MAPPER, surveyId, startDate, endDate));
-            analytics.setTimeSeriesData(timeSeriesData);
-
-            return analytics;
-        } catch (DataAccessException e) {
-            log.error("Error retrieving time series analytics", e);
-            throw new PlatformServiceUnavailableException("error.msg.survey.timeseries.analytics.retrieval.failed",
-                    "Failed to retrieve time series analytics for survey: " + surveyName, e);
-        }
+        Object value = data.get("survey_id");
+        return value instanceof Long ? (Long) value : Long.valueOf(value.toString());
     }
 
-    @Override
-    @Transactional(readOnly = true)
-    public SurveyAnalyticsData getCorrelationAnalytics(String surveyName, List<String> questionCodes, LocalDate startDate, LocalDate endDate) {
-        validateInput(surveyName, startDate, endDate);
-        validateQuestionCodes(questionCodes);
-
-        context.authenticatedUser().validateHasDatatableReadPermission(surveyName);
-
-        SurveyAnalyticsData analytics = new SurveyAnalyticsData()
-                .setSurveyName(surveyName)
-                .setStartDate(startDate)
-                .setEndDate(endDate);
-
-        try {
-            Long surveyId = getSurveyId(surveyName);
-            if (surveyId == null) {
-                throw new SurveyNotFoundException(surveyName);
-            }
-
-            Map<String, Double> correlations = calculateCorrelations(surveyId, questionCodes);
-            analytics.setCorrelations(correlations);
-            return analytics;
-        } catch (DataAccessException e) {
-            log.error("Error retrieving correlation analytics", e);
-            throw new PlatformServiceUnavailableException("error.msg.survey.correlation.analytics.retrieval.failed",
-                    "Failed to retrieve correlation analytics for survey: " + surveyName, e);
+    private LocalDate getLocalDateValue(Map<String, Object> data, String key) {
+        if (data == null || !data.containsKey(key) || data.get(key) == null) {
+            return null;
         }
+        Object value = data.get(key);
+        if (value instanceof java.sql.Date) {
+            return ((java.sql.Date) value).toLocalDate();
+        }
+        return null;
     }
-
-    private void validateQuestionCodes(List<String> questionCodes) {
-        if (questionCodes == null || questionCodes.isEmpty()) {
-            throw new IllegalArgumentException("Question codes cannot be empty");
-        }
-
-        // Validate each question code format
-        questionCodes.forEach(code -> {
-            if (!StringUtils.hasText(code) || !code.matches("^[a-zA-Z0-9_-]+$")) {
-                throw new IllegalArgumentException("Invalid question code format: " + code);
-            }
-        });
-    }
-
-    private Map<String, Double> calculateCorrelations(Long surveyId, List<String> questionCodes) {
-        Map<String, Double> correlations = new HashMap<>();
-
-        // Get the base data for each question
-        Map<String, Map<Long, Double>> questionValues = new HashMap<>();
-
-        // Prepare the base query for each question
-        String baseQuery = String.format("""
-                         SELECT sc.client_id, sc.a_value\s
-                         FROM %s sc\s
-                         JOIN %s sq ON sc.question_id = sq.id\s
-                         WHERE sc.survey_id = ? AND sq.a_key = ?
-                        \s""",
-                sqlGenerator.escape(SCORECARD_TABLE),
-                sqlGenerator.escape(QUESTION_TABLE));
-
-        // Collect values for each question
-        for (String questionCode : questionCodes) {
-            Map<Long, Double> values = new HashMap<>();
-            jdbcTemplate.query(
-                    baseQuery,
-                    (rs, rowNum) -> {
-                        values.put(rs.getLong("client_id"), rs.getDouble("a_value"));
-                        return null;
-                    },
-                    surveyId, questionCode
-            );
-            questionValues.put(questionCode, values);
-        }
-
-        // Calculate correlations
-        for (int i = 0; i < questionCodes.size(); i++) {
-            String code1 = questionCodes.get(i);
-            Map<Long, Double> values1 = questionValues.get(code1);
-
-            for (int j = i + 1; j < questionCodes.size(); j++) {
-                String code2 = questionCodes.get(j);
-                Map<Long, Double> values2 = questionValues.get(code2);
-
-                // Calculate correlation between two questions
-                double correlation = calculatePearsonCorrelation(values1, values2);
-                correlations.put(code1 + "_" + code2, correlation);
-            }
-        }
-
-        return correlations;
-    }
-
-    private double calculatePearsonCorrelation(Map<Long, Double> values1, Map<Long, Double> values2) {
-        // Get common client IDs
-        Set<Long> commonClients = values1.keySet().stream()
-                .filter(values2::containsKey)
-                .collect(Collectors.toSet());
-
-        if (commonClients.isEmpty()) {
-            return 0.0;
-        }
-
-        // Calculate means
-        double mean1 = commonClients.stream().mapToDouble(values1::get).average().orElse(0.0);
-        double mean2 = commonClients.stream().mapToDouble(values2::get).average().orElse(0.0);
-
-        // Calculate correlation
-        double numerator = 0.0;
-        double denominator1 = 0.0;
-        double denominator2 = 0.0;
-
-        for (Long clientId : commonClients) {
-            double diff1 = values1.get(clientId) - mean1;
-            double diff2 = values2.get(clientId) - mean2;
-
-            numerator += diff1 * diff2;
-            denominator1 += diff1 * diff1;
-            denominator2 += diff2 * diff2;
-        }
-
-        if (denominator1 == 0.0 || denominator2 == 0.0) {
-            return 0.0;
-        }
-
-        return numerator / Math.sqrt(denominator1 * denominator2);
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public List<SurveyAnalyticsData> getComparativeAnalytics(List<String> surveyNames, LocalDate startDate, LocalDate endDate) {
-        if (surveyNames == null || surveyNames.isEmpty()) {
-            throw new IllegalArgumentException("Survey names cannot be empty");
-        }
-        validateDateRange(startDate, endDate);
-
-        return surveyNames.stream()
-                .map(surveyName -> getSurveyAnalytics(surveyName, startDate, endDate))
-                .collect(Collectors.toList());
-    }
-} 
+}
