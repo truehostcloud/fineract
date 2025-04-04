@@ -25,4 +25,7 @@ public class SurveyNotFoundException extends AbstractPlatformResourceNotFoundExc
     public SurveyNotFoundException(final Long id) {
         super("error.msg.survey.id.notfound", "Survey with id " + id + " not found!", id);
     }
+    public SurveyNotFoundException(String surveyName) {
+        super("error.msg.survey.not.found", "Survey with name " + surveyName + " does not exist", surveyName);
+    }
 }
