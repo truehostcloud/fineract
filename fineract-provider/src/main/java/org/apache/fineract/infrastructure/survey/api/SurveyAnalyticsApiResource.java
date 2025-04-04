@@ -6,12 +6,12 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.MediaType;
 import java.time.LocalDate;
-import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.apache.fineract.infrastructure.core.serialization.DefaultToApiJsonSerializer;
-import org.apache.fineract.infrastructure.survey.data.SurveyAnalyticsData;
+import org.apache.fineract.infrastructure.survey.data.SurveyResponseAnalyticsData;
 import org.apache.fineract.infrastructure.survey.service.SurveyAnalyticsService;
 import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
 
 @Path("/v1/surveys/analytics")
 @Component
