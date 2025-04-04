@@ -14,28 +14,13 @@ import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
 @Path("/v1/surveys/analytics")
-@Component
 @Tag(name = "Survey Analytics", description = "Survey analytics and statistics endpoints")
+@Component
 @RequiredArgsConstructor
 public class SurveyAnalyticsApiResource {
 
     private final SurveyAnalyticsService analyticsService;
-    private final DefaultToApiJsonSerializer<SurveyAnalyticsData> toApiJsonSerializer;
-
-    @GET
-    @Path("/{surveyName}")
-    @Consumes({ MediaType.APPLICATION_JSON })
-    @Produces({ MediaType.APPLICATION_JSON })
-    @Operation(summary = "Get survey analytics", description = "Retrieves analytics for a specific survey")
-    public String getSurveyAnalytics(
-            @PathParam("surveyName") @Parameter(description = "Survey name") String surveyName,
-            @QueryParam("startDate") @Parameter(description = "Start date (yyyy-MM-dd)") String startDate,
-            @QueryParam("endDate") @Parameter(description = "End date (yyyy-MM-dd)") String endDate) {
-        
-        LocalDate[] dates = parseDates(startDate, endDate);
-        SurveyAnalyticsData analytics = analyticsService.getSurveyAnalytics(surveyName, dates[0], dates[1]);
-        return toApiJsonSerializer.serialize(analytics);
-    }
+    private final DefaultToApiJsonSerializer<SurveyResponseAnalyticsData> responseAnalyticsSerializer;
 
     @GET
     @Path("/{surveyName}/demographic")
