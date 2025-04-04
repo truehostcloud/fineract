@@ -9,6 +9,7 @@ import lombok.experimental.Accessors;
 @NoArgsConstructor
 @Accessors(chain = true)
 public class QuestionAnalyticsData {
+
     private String questionCode;
     private String questionText;
     private Map<String, Integer> answerDistribution;
@@ -20,4 +21,4 @@ public class QuestionAnalyticsData {
     private String mostCommonAnswer;
     private String leastCommonAnswer;
     private double answerDiversityIndex;
-} 
+}

@@ -24,11 +24,10 @@ public class SurveyAnalyticsApiResource {
 
     @GET
     @Path("/{surveyName}/responses")
-    @Consumes({MediaType.APPLICATION_JSON})
-    @Produces({MediaType.APPLICATION_JSON})
+    @Consumes({ MediaType.APPLICATION_JSON })
+    @Produces({ MediaType.APPLICATION_JSON })
     @Operation(summary = "Get survey response analytics", description = "Retrieves response distribution analytics for a specific survey")
-    public String getSurveyResponseAnalytics(
-            @PathParam("surveyName") @Parameter(description = "Survey name") final String surveyName,
+    public String getSurveyResponseAnalytics(@PathParam("surveyName") @Parameter(description = "Survey name") final String surveyName,
             @QueryParam("startDate") @Parameter(description = "Start date (yyyy-MM-dd)") final String startDate,
             @QueryParam("endDate") @Parameter(description = "End date (yyyy-MM-dd)") final String endDate) {
 
@@ -53,4 +52,4 @@ public class SurveyAnalyticsApiResource {
         final SurveyResponseAnalyticsData analytics = analyticsService.getSurveyResponseAnalytics(surveyName, start, end);
         return responseAnalyticsSerializer.serialize(analytics);
     }
-} 
+}

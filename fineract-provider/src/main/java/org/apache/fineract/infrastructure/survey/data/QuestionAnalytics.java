@@ -9,13 +9,14 @@ import lombok.experimental.Accessors;
 @NoArgsConstructor
 @Accessors(chain = true)
 public class QuestionAnalytics {
+
     private String questionCode;
     private String questionText;
     private Map<String, Integer> answerDistribution;
     private double averageScore;
     private double standardDeviation;
     private Map<String, Double> correlationsWithOtherQuestions;
-    
+
     // Enhanced analytics fields
     private int totalResponses;
     private double responseRate;
@@ -28,4 +29,4 @@ public class QuestionAnalytics {
     private double firstQuartile;
     private double thirdQuartile;
     private Map<Double, Integer> scoreFrequency;
-} 
+}

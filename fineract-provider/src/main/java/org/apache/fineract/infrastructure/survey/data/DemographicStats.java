@@ -9,8 +9,9 @@ import lombok.experimental.Accessors;
 @NoArgsConstructor
 @Accessors(chain = true)
 public class DemographicStats {
+
     private String demographicValue;
     private int responseCount;
     private double averageScore;
     private Map<String, Double> questionAverages;
-} 
+}

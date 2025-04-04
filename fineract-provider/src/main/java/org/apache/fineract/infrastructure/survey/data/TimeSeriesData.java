@@ -10,15 +10,16 @@ import lombok.experimental.Accessors;
 @NoArgsConstructor
 @Accessors(chain = true)
 public class TimeSeriesData {
+
     private LocalDate date;
     private int responseCount;
     private double averageScore;
     private Map<String, Double> questionAverages;
-    
+
     // Enhanced analytics fields
     private Map<String, Integer> answerDistribution;
     private Map<String, Double> standardDeviations;
     private Map<String, Map<String, Integer>> demographicBreakdowns;
     private Map<String, Double> correlationTrends;
     private Map<String, Double> responseRates;
-} 
+}
