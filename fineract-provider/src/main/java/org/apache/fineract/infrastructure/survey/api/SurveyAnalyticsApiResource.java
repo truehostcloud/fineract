@@ -50,6 +50,7 @@ public class SurveyAnalyticsApiResource {
             throw new IllegalArgumentException("Invalid date format. Please use yyyy-MM-dd");
         }
 
-        return new LocalDate[]{start, end};
+        final SurveyResponseAnalyticsData analytics = analyticsService.getSurveyResponseAnalytics(surveyName, start, end);
+        return responseAnalyticsSerializer.serialize(analytics);
     }
 } 
