@@ -19,10 +19,15 @@
 
 package org.apache.fineract.portfolio.self.spm.api;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.ws.rs.Consumes;
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.POST;
+import jakarta.ws.rs.PUT;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.PathParam;
 import jakarta.ws.rs.Produces;
@@ -69,7 +74,33 @@ public class SelfScorecardApiResource {
             validateAppuserClientsMapping(scorecardData.getClientId());
             this.scorecardApiResource.createScorecard(surveyId, scorecardData);
         }
+    }
 
+    @PUT
+    @Path("{surveyId}/clients/{clientId}")
+    @Consumes({ MediaType.APPLICATION_JSON })
+    @Produces({ MediaType.APPLICATION_JSON })
+    @Transactional
+    @Operation(summary = "Update a Scorecard entry", description = "Update an existing survey response for a client.\n" + "\n"
+            + "Mandatory Fields\n" + "clientId, createdOn, questionId, responseId, staffId")
+    @ApiResponses({ @ApiResponse(responseCode = "200", description = "OK") })
+    public void updateScorecard(@PathParam("surveyId") @Parameter(description = "Enter surveyId") final Long surveyId,
+            @PathParam("clientId") @Parameter(description = "Enter clientId") final Long clientId,
+            @Parameter(description = "scorecardData") final ScorecardData scorecardData) {
+        validateAppuserClientsMapping(clientId);
+        this.scorecardApiResource.updateScorecard(surveyId, clientId, scorecardData);
+    }
+
+    @GET
+    @Path("{surveyId}/clients/{clientId}")
+    @Consumes({ MediaType.APPLICATION_JSON })
+    @Produces({ MediaType.APPLICATION_JSON })
+    @Transactional
+    @Operation(summary = "Retrieve most recent survey submission", description = "Retrieves the most recent survey submission for a client to allow updates")
+    public List<ScorecardData> findBySurveyAndClient(@PathParam("surveyId") @Parameter(description = "Enter surveyId") final Long surveyId,
+            @PathParam("clientId") @Parameter(description = "Enter clientId") final Long clientId) {
+        validateAppuserClientsMapping(clientId);
+        return this.scorecardApiResource.findBySurveyAndClient(surveyId, clientId);
     }
 
     private void validateAppuserClientsMapping(final Long clientId) {
