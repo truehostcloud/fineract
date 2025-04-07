@@ -16,21 +16,30 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.fineract.infrastructure.event.external.service.serialization.mapper.loan;
 
-import org.apache.fineract.avro.loan.v1.LoanChargeDataRangeViewV1;
-import org.apache.fineract.avro.loan.v1.LoanChargeDataV1;
-import org.apache.fineract.infrastructure.event.external.service.serialization.mapper.support.AvroMapperConfig;
-import org.apache.fineract.portfolio.loanaccount.data.LoanChargeData;
-import org.mapstruct.Mapper;
-import org.mapstruct.Mapping;
+package org.apache.fineract.test.messaging.event.loan.transaction;
 
-@Mapper(config = AvroMapperConfig.class)
-public interface LoanChargeDataMapper {
+import java.util.function.Function;
+import org.apache.fineract.avro.BulkMessagePayloadV1;
+import org.apache.fineract.test.messaging.event.Event;
 
-    @Mapping(target = "externalOwnerId", ignore = true)
-    @Mapping(target = "customData", ignore = true)
-    LoanChargeDataV1 map(LoanChargeData source);
+public class BulkBusinessEvent implements Event<BulkMessagePayloadV1> {
 
-    LoanChargeDataRangeViewV1 mapRangeView(LoanChargeData source);
+    public static final String TYPE = "BulkBusinessEvent";
+
+    @Override
+    public String getEventName() {
+        return TYPE;
+    }
+
+    @Override
+    public Class<BulkMessagePayloadV1> getDataClass() {
+        return BulkMessagePayloadV1.class;
+    }
+
+    // not implemented
+    @Override
+    public Function<BulkMessagePayloadV1, Long> getIdExtractor() {
+        throw new UnsupportedOperationException("Not implemented");
+    }
 }

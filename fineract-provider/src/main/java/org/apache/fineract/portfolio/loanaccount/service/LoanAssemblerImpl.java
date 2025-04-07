@@ -93,6 +93,7 @@ import org.apache.fineract.portfolio.loanaccount.loanschedule.service.LoanSchedu
 import org.apache.fineract.portfolio.loanaccount.loanschedule.service.LoanScheduleCalculationPlatformService;
 import org.apache.fineract.portfolio.loanaccount.mapper.LoanChargeMapper;
 import org.apache.fineract.portfolio.loanaccount.mapper.LoanCollateralManagementMapper;
+import org.apache.fineract.portfolio.loanaccount.service.schedule.LoanScheduleComponent;
 import org.apache.fineract.portfolio.loanproduct.LoanProductConstants;
 import org.apache.fineract.portfolio.loanproduct.domain.LoanProduct;
 import org.apache.fineract.portfolio.loanproduct.domain.LoanProductRelatedDetail;
@@ -137,6 +138,7 @@ public class LoanAssemblerImpl implements LoanAssembler {
     private final LoanDisbursementService loanDisbursementService;
     private final LoanChargeService loanChargeService;
     private final LoanOfficerService loanOfficerService;
+    private final LoanScheduleComponent loanSchedule;
 
     @Override
     public Loan assembleFrom(final Long accountId) {
@@ -169,7 +171,7 @@ public class LoanAssemblerImpl implements LoanAssembler {
 
     @Override
     public void setHelpers(final Loan loanAccount) {
-        loanAccount.setHelpers(defaultLoanLifecycleStateMachine, loanRepaymentScheduleTransactionProcessorFactory);
+        loanAccount.setHelpers(defaultLoanLifecycleStateMachine);
     }
 
     @Override
@@ -293,8 +295,10 @@ public class LoanAssemblerImpl implements LoanAssembler {
             throw new IllegalStateException("No loan application exists for either a client or group (or both).");
         }
 
+        loanSchedule.updateLoanSchedule(loanApplication, loanScheduleModel);
+
         copyAdvancedPaymentRulesIfApplicable(transactionProcessingStrategyCode, loanProduct, loanApplication);
-        loanApplication.setHelpers(defaultLoanLifecycleStateMachine, this.loanRepaymentScheduleTransactionProcessorFactory);
+        loanApplication.setHelpers(defaultLoanLifecycleStateMachine);
         // TODO: review
         loanChargeService.recalculateAllCharges(loanApplication);
         topUpLoanConfiguration(element, loanApplication);
@@ -858,8 +862,8 @@ public class LoanAssemblerImpl implements LoanAssembler {
             final JsonElement parsedQuery = this.fromApiJsonHelper.parse(command.json());
             final JsonQuery query = JsonQuery.from(command.json(), parsedQuery, this.fromApiJsonHelper);
 
-            final LoanScheduleModel loanSchedule = this.calculationPlatformService.calculateLoanSchedule(query, false);
-            loan.updateLoanSchedule(loanSchedule);
+            final LoanScheduleModel loanScheduleModel = this.calculationPlatformService.calculateLoanSchedule(query, false);
+            loanSchedule.updateLoanSchedule(loan, loanScheduleModel);
             loanAccrualsProcessingService.reprocessExistingAccruals(loan);
             loanChargeService.recalculateAllCharges(loan);
         }

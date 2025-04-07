@@ -79,6 +79,7 @@ import org.apache.fineract.portfolio.loanaccount.service.LoanAssembler;
 import org.apache.fineract.portfolio.loanaccount.service.LoanChargeService;
 import org.apache.fineract.portfolio.loanaccount.service.LoanUtilService;
 import org.apache.fineract.portfolio.loanaccount.service.ReprocessLoanTransactionsService;
+import org.apache.fineract.portfolio.loanaccount.service.schedule.LoanScheduleComponent;
 import org.apache.fineract.useradministration.domain.AppUser;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -115,6 +116,7 @@ public class LoanRescheduleRequestWritePlatformServiceImpl implements LoanResche
     private final LoanAccrualsProcessingService loanAccrualsProcessingService;
     private final LoanChargeService loanChargeService;
     private final ReprocessLoanTransactionsService reprocessLoanTransactionsService;
+    private final LoanScheduleComponent loanSchedule;
 
     /**
      * create a new instance of the LoanRescheduleRequest object from the JsonCommand object and persist
@@ -422,15 +424,15 @@ public class LoanRescheduleRequestWritePlatformServiceImpl implements LoanResche
             final LoanScheduleGenerator loanScheduleGenerator = this.loanScheduleFactory.create(loanApplicationTerms.getLoanScheduleType(),
                     loanApplicationTerms.getInterestMethod());
             final LoanLifecycleStateMachine loanLifecycleStateMachine = null;
-            loan.setHelpers(loanLifecycleStateMachine, this.loanRepaymentScheduleTransactionProcessorFactory);
-            final LoanScheduleDTO loanSchedule = loanScheduleGenerator.rescheduleNextInstallments(mathContext, loanApplicationTerms, loan,
-                    loanApplicationTerms.getHolidayDetailDTO(), loanRepaymentScheduleTransactionProcessor, rescheduleFromDate);
+            loan.setHelpers(loanLifecycleStateMachine);
+            final LoanScheduleDTO loanScheduleDTO = loanScheduleGenerator.rescheduleNextInstallments(mathContext, loanApplicationTerms,
+                    loan, loanApplicationTerms.getHolidayDetailDTO(), loanRepaymentScheduleTransactionProcessor, rescheduleFromDate);
 
             // Either the installments got recalculated or the model
-            if (loanSchedule.getInstallments() != null) {
-                loan.updateLoanSchedule(loanSchedule.getInstallments());
+            if (loanScheduleDTO.getInstallments() != null) {
+                loanSchedule.updateLoanSchedule(loan, loanScheduleDTO.getInstallments());
             } else {
-                loan.updateLoanSchedule(loanSchedule.getLoanScheduleModel());
+                loanSchedule.updateLoanSchedule(loan, loanScheduleDTO.getLoanScheduleModel());
             }
             loanAccrualsProcessingService.reprocessExistingAccruals(loan);
             loanChargeService.recalculateAllCharges(loan);
