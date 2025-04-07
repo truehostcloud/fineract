@@ -49,4 +49,15 @@ public class ScorecardService {
 
         return this.scorecardRepository.findBySurveyAndClient(survey, client);
     }
+
+    public boolean hasClientSubmittedSurvey(final Survey survey, final Client client) {
+        this.securityContext.authenticatedUser();
+        List<Scorecard> existingSubmissions = this.scorecardRepository.findBySurveyAndClient(survey, client);
+        return !existingSubmissions.isEmpty();
+    }
+
+    public List<Scorecard> updateScorecard(final List<Scorecard> scorecards) {
+        this.securityContext.authenticatedUser();
+        return this.scorecardRepository.saveAll(scorecards);
+    }
 }
