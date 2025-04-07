@@ -16,21 +16,14 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.fineract.infrastructure.event.external.service.serialization.mapper.loan;
+package org.apache.fineract.portfolio.collateralmanagement.data;
 
-import org.apache.fineract.avro.loan.v1.LoanChargeDataRangeViewV1;
-import org.apache.fineract.avro.loan.v1.LoanChargeDataV1;
-import org.apache.fineract.infrastructure.event.external.service.serialization.mapper.support.AvroMapperConfig;
-import org.apache.fineract.portfolio.loanaccount.data.LoanChargeData;
-import org.mapstruct.Mapper;
-import org.mapstruct.Mapping;
+import java.io.Serial;
+import java.io.Serializable;
+import java.math.BigDecimal;
 
-@Mapper(config = AvroMapperConfig.class)
-public interface LoanChargeDataMapper {
+public record UpdateClientCollateralRequest(BigDecimal quantity, String locale) implements Serializable {
 
-    @Mapping(target = "externalOwnerId", ignore = true)
-    @Mapping(target = "customData", ignore = true)
-    LoanChargeDataV1 map(LoanChargeData source);
-
-    LoanChargeDataRangeViewV1 mapRangeView(LoanChargeData source);
+    @Serial
+    private static final long serialVersionUID = 1L;
 }

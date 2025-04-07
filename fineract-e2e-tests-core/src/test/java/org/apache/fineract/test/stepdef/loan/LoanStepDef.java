@@ -127,6 +127,7 @@ import org.apache.fineract.test.messaging.config.EventProperties;
 import org.apache.fineract.test.messaging.event.EventCheckHelper;
 import org.apache.fineract.test.messaging.event.loan.LoanRescheduledDueAdjustScheduleEvent;
 import org.apache.fineract.test.messaging.event.loan.LoanStatusChangedEvent;
+import org.apache.fineract.test.messaging.event.loan.transaction.BulkBusinessEvent;
 import org.apache.fineract.test.messaging.event.loan.transaction.LoanAccrualAdjustmentTransactionBusinessEvent;
 import org.apache.fineract.test.messaging.event.loan.transaction.LoanAccrualTransactionCreatedBusinessEvent;
 import org.apache.fineract.test.messaging.event.loan.transaction.LoanAdjustTransactionBusinessEvent;
@@ -1422,12 +1423,7 @@ public class LoanStepDef extends AbstractStepDef {
         Response<PostLoansResponse> loanResponse = testContext().get(TestContextKey.LOAN_CREATE_RESPONSE);
         long loanId = loanResponse.body().getLoanId();
 
-        PostLoansLoanIdTransactionsRequest chargeOffRequest = LoanRequestFactory.defaultChargeOffRequest().transactionDate(transactionDate)
-                .dateFormat(DATE_FORMAT).locale(DEFAULT_LOCALE);
-
-        Response<PostLoansLoanIdTransactionsResponse> chargeOffResponse = loanTransactionsApi
-                .executeLoanTransaction(loanId, chargeOffRequest, "charge-off").execute();
-        testContext().set(TestContextKey.LOAN_CHARGE_OFF_RESPONSE, chargeOffResponse);
+        Response<PostLoansLoanIdTransactionsResponse> chargeOffResponse = chargeOffUndo(loanId, transactionDate);
         ErrorHelper.checkSuccessfulApiCall(chargeOffResponse);
 
         Long transactionId = chargeOffResponse.body().getResourceId();
@@ -1440,13 +1436,7 @@ public class LoanStepDef extends AbstractStepDef {
         Response<PostLoansResponse> loanResponse = testContext().get(TestContextKey.LOAN_CREATE_RESPONSE);
         long loanId = loanResponse.body().getLoanId();
 
-        PostLoansLoanIdTransactionsRequest chargeOffRequest = LoanRequestFactory.defaultChargeOffRequest().transactionDate(transactionDate)
-                .dateFormat(DATE_FORMAT).locale(DEFAULT_LOCALE);
-
-        Response<PostLoansLoanIdTransactionsResponse> chargeOffResponse = loanTransactionsApi
-                .executeLoanTransaction(loanId, chargeOffRequest, "charge-off").execute();
-        testContext().set(TestContextKey.LOAN_CHARGE_OFF_RESPONSE, chargeOffResponse);
-
+        Response<PostLoansLoanIdTransactionsResponse> chargeOffResponse = chargeOffUndo(loanId, transactionDate);
         assertThat(chargeOffResponse.isSuccessful()).isFalse();
 
         String string = chargeOffResponse.errorBody().string();
@@ -1512,13 +1502,7 @@ public class LoanStepDef extends AbstractStepDef {
         Response<PostLoansResponse> loanResponse = testContext().get(TestContextKey.LOAN_CREATE_RESPONSE);
         long loanId = loanResponse.body().getLoanId();
 
-        PostLoansLoanIdTransactionsRequest chargeOffRequest = LoanRequestFactory.defaultChargeOffRequest().transactionDate(transactionDate)
-                .dateFormat(DATE_FORMAT).locale(DEFAULT_LOCALE);
-
-        Response<PostLoansLoanIdTransactionsResponse> chargeOffResponse = loanTransactionsApi
-                .executeLoanTransaction(loanId, chargeOffRequest, "charge-off").execute();
-        testContext().set(TestContextKey.LOAN_CHARGE_OFF_RESPONSE, chargeOffResponse);
-
+        Response<PostLoansLoanIdTransactionsResponse> chargeOffResponse = chargeOffUndo(loanId, transactionDate);
         assertThat(chargeOffResponse.isSuccessful()).isFalse();
 
         String string = chargeOffResponse.errorBody().string();
@@ -1560,20 +1544,39 @@ public class LoanStepDef extends AbstractStepDef {
         eventAssertion.assertEventRaised(LoanChargeOffUndoEvent.class, transactionId);
     }
 
-    @Then("Charge-off undo is not possible on {string}")
-    public void chargeOffUndoFailure(String transactionDate) throws IOException {
-        Response<PostLoansResponse> loanResponse = testContext().get(TestContextKey.LOAN_CREATE_RESPONSE);
-        Long loanId = loanResponse.body().getLoanId();
-
+    public Response<PostLoansLoanIdTransactionsResponse> chargeOffUndo(Long loanId, String transactionDate) throws IOException {
         PostLoansLoanIdTransactionsRequest chargeOffRequest = LoanRequestFactory.defaultChargeOffRequest().transactionDate(transactionDate)
                 .dateFormat(DATE_FORMAT).locale(DEFAULT_LOCALE);
 
         Response<PostLoansLoanIdTransactionsResponse> chargeOffResponse = loanTransactionsApi
                 .executeLoanTransaction(loanId, chargeOffRequest, "charge-off").execute();
         testContext().set(TestContextKey.LOAN_CHARGE_OFF_RESPONSE, chargeOffResponse);
+        return chargeOffResponse;
+    }
+
+    @Then("Charge-off undo is not possible on {string}")
+    public void chargeOffUndoFailure(String transactionDate) throws IOException {
+        Response<PostLoansResponse> loanResponse = testContext().get(TestContextKey.LOAN_CREATE_RESPONSE);
+        Long loanId = loanResponse.body().getLoanId();
+
+        Response<PostLoansLoanIdTransactionsResponse> chargeOffResponse = chargeOffUndo(loanId, transactionDate);
+
         ErrorResponse errorDetails = ErrorResponse.from(chargeOffResponse);
         assertThat(errorDetails.getHttpStatusCode()).as(ErrorMessageHelper.chargeOffUndoFailureCodeMsg()).isEqualTo(403);
         assertThat(errorDetails.getSingleError().getDeveloperMessage()).isEqualTo(ErrorMessageHelper.chargeOffUndoFailure(loanId));
+    }
+
+    @Then("Charge-off undo is not possible on {string} due to monetary activity before")
+    public void chargeOffUndoFailureDueToMonetaryActivityBefore(String transactionDate) throws IOException {
+        Response<PostLoansResponse> loanResponse = testContext().get(TestContextKey.LOAN_CREATE_RESPONSE);
+        Long loanId = loanResponse.body().getLoanId();
+
+        Response<PostLoansLoanIdTransactionsResponse> chargeOffResponse = chargeOffUndo(loanId, transactionDate);
+
+        ErrorResponse errorDetails = ErrorResponse.from(chargeOffResponse);
+        assertThat(errorDetails.getHttpStatusCode()).as(ErrorMessageHelper.chargeOffUndoFailureCodeMsg()).isEqualTo(403);
+        assertThat(errorDetails.getSingleError().getDeveloperMessage())
+                .isEqualTo(ErrorMessageHelper.chargeOffUndoFailureDueToMonetaryActivityBefore(loanId));
     }
 
     @Then("Charge-off undo is not possible as the loan is not charged-off")
@@ -2335,7 +2338,8 @@ public class LoanStepDef extends AbstractStepDef {
 
         List<GetLoansLoanIdTransactions> transactions = loanDetailsResponse.body().getTransactions();
         GetLoansLoanIdTransactions accrualTransaction = transactions.stream()
-                .filter(t -> date.equals(FORMATTER.format(t.getDate())) && "Accrual".equals(t.getType().getValue())).findFirst()
+                .filter(t -> date.equals(FORMATTER.format(t.getDate())) && "Accrual".equals(t.getType().getValue()))
+                .reduce((first, second) -> second)
                 .orElseThrow(() -> new IllegalStateException(String.format("No Accrual transaction found on %s", date)));
         Long accrualTransactionId = accrualTransaction.getId();
 
@@ -2376,6 +2380,11 @@ public class LoanStepDef extends AbstractStepDef {
         eventAssertion.assertEventRaised(LoanChargeAdjustmentPostBusinessEvent.class, loadTransaction.getId());
     }
 
+    @Then("BulkBusinessEvent is not raised on {string}")
+    public void checkLoanBulkBusinessEventNotCreatedBusinessEvent(String date) {
+        eventAssertion.assertEventNotRaised(BulkBusinessEvent.class, em -> FORMATTER.format(em.getBusinessDate()).equals(date));
+    }
+
     @Then("LoanAccrualTransactionCreatedBusinessEvent is not raised on {string}")
     public void checkLoanAccrualTransactionNotCreatedBusinessEvent(String date) throws IOException {
         Response<PostLoansResponse> loanCreateResponse = testContext().get(TestContextKey.LOAN_CREATE_RESPONSE);
@@ -2388,6 +2397,9 @@ public class LoanStepDef extends AbstractStepDef {
 
         assertThat(transactions).as("Unexpected Accrual activity transaction found on %s", date)
                 .noneMatch(t -> date.equals(FORMATTER.format(t.getDate())) && "Accrual Activity".equals(t.getType().getValue()));
+
+        eventAssertion.assertEventNotRaised(LoanAccrualTransactionCreatedBusinessEvent.class,
+                em -> FORMATTER.format(em.getBusinessDate()).equals(date));
     }
 
     @Then("{string} transaction on {string} got reverse-replayed on {string}")
