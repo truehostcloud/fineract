@@ -144,6 +144,11 @@ public class ScorecardApiResource {
     public void updateScorecard(@PathParam("surveyId") @Parameter(description = "Survey ID") final Long surveyId,
             @PathParam("clientId") @Parameter(description = "Client ID") final Long clientId,
             @Parameter(description = "Scorecard data to update") final ScorecardData scorecardData) {
+        
+        if (scorecardData.getClientId() != null && !scorecardData.getClientId().equals(clientId)) {
+            throw new PlatformDataIntegrityException("error.msg.scorecard.clientId.mismatch", 
+                "The clientId in the path does not match the clientId in the request body", "clientId", clientId);
+        }
 
         final AppUser appUser = this.securityContext.authenticatedUser();
         final Survey survey = this.spmService.findById(surveyId);
