@@ -137,7 +137,7 @@ public class ScorecardApiResource {
     @Produces({ MediaType.APPLICATION_JSON })
     @Transactional
     @Operation(summary = "Update a Scorecard entry", description = "Updates the most recent survey submission for a client.", responses = {
-            @ApiResponse(responseCode = "200", description = "Scorecard updated successfully", content = @Content(schema = @Schema(implementation = ScorecardData.class))),
+            @ApiResponse(responseCode = "200", description = "Scorecard updated successfully"),
             @ApiResponse(responseCode = "400", description = "Invalid request data"),
             @ApiResponse(responseCode = "404", description = "Survey or client not found"),
             @ApiResponse(responseCode = "409", description = "Survey not submitted yet") })
