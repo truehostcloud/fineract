@@ -224,7 +224,7 @@ public class SurveyAnalyticsServiceImpl implements SurveyAnalyticsService {
 
     private void validateDates(LocalDate startDate, LocalDate endDate, Map<String, Object> surveyData) {
         if (startDate != null && endDate != null && startDate.isAfter(endDate)) {
-            throw new IllegalArgumentException("Start date cannot be after end date");
+            throw new IllegalArgumentException("Start date " + startDate + " cannot be after end date " + endDate);
         }
 
         LocalDate validFrom = getLocalDateValue(surveyData, "valid_from");
@@ -232,19 +232,19 @@ public class SurveyAnalyticsServiceImpl implements SurveyAnalyticsService {
 
         if (validFrom != null) {
             if (startDate != null && startDate.isBefore(validFrom)) {
-                throw new IllegalArgumentException("Start date cannot be before survey validity period");
+                throw new IllegalArgumentException("Start date " + startDate + " cannot be before survey validity period starting " + validFrom);
             }
             if (endDate != null && endDate.isBefore(validFrom)) {
-                throw new IllegalArgumentException("End date cannot be before survey validity period");
+                throw new IllegalArgumentException("End date " + endDate + " cannot be before survey validity period starting " + validFrom);
             }
         }
 
         if (validTo != null) {
             if (endDate != null && endDate.isAfter(validTo)) {
-                throw new IllegalArgumentException("End date cannot be after survey validity period");
+                throw new IllegalArgumentException("End date " + endDate + " cannot be after survey validity period ending " + validTo);
             }
             if (startDate != null && startDate.isAfter(validTo)) {
-                throw new IllegalArgumentException("Start date cannot be after survey validity period");
+                throw new IllegalArgumentException("Start date " + startDate + " cannot be after survey validity period ending " + validTo);
             }
         }
     }
