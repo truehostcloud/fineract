@@ -237,6 +237,12 @@ public class SurveyAnalyticsServiceImpl implements SurveyAnalyticsService {
         if (validTo != null && startDate != null && startDate.isAfter(validTo)) {
             throw new IllegalArgumentException("Start date " + startDate + " cannot be after survey validity period ending " + validTo);
         }
+        if (validFrom != null && validTo != null && startDate != null && endDate != null) {
+            if (endDate.isBefore(validFrom) || startDate.isAfter(validTo)) {
+                throw new IllegalArgumentException("The provided date range (" + startDate + " to " + endDate + 
+                    ") is completely outside the survey's validity period (" + validFrom + " to " + validTo + ")");
+            }
+        }
     }
 
     private Integer queryForIntSafely(MapSqlParameterSource params) {
