@@ -251,9 +251,9 @@ public class SurveyAnalyticsServiceImpl implements SurveyAnalyticsService {
 
     private Integer queryForIntSafely(MapSqlParameterSource params) {
         try {
-            return namedParameterJdbcTemplate.queryForObject(SurveyAnalyticsServiceImpl.TOTAL_UNIQUE_CLIENTS_QUERY, params, Integer.class);
+            return namedParameterJdbcTemplate.queryForObject(TOTAL_UNIQUE_CLIENTS_QUERY, params, Integer.class);
         } catch (DataAccessException e) {
-            log.warn("Error querying for int with SQL: {}, params: {}", SurveyAnalyticsServiceImpl.TOTAL_UNIQUE_CLIENTS_QUERY, params, e);
+            log.warn("Error querying for int with SQL: {}, params: {}", TOTAL_UNIQUE_CLIENTS_QUERY, params, e);
             return 0;
         }
     }
