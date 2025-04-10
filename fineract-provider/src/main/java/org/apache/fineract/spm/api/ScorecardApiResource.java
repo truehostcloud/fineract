@@ -141,7 +141,7 @@ public class ScorecardApiResource {
             @ApiResponse(responseCode = "400", description = "Invalid request data"),
             @ApiResponse(responseCode = "404", description = "Survey or client not found"),
             @ApiResponse(responseCode = "409", description = "Survey not submitted yet") })
-    public void updateScorecard(@PathParam("surveyId") @Parameter(description = "Survey ID") final Long surveyId,
+    public List<ScorecardData> updateScorecard(@PathParam("surveyId") @Parameter(description = "Survey ID") final Long surveyId,
             @PathParam("clientId") @Parameter(description = "Client ID") final Long clientId,
             @Parameter(description = "Scorecard data to update") final ScorecardData scorecardData) {
         
@@ -176,5 +176,7 @@ public class ScorecardApiResource {
         }
 
         this.scorecardService.updateScorecard(mostRecentSubmission);
+        
+        return (List<ScorecardData>) this.scorecardReadPlatformService.retrieveScorecardBySurveyAndClient(surveyId, clientId);
     }
 }
