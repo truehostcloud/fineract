@@ -223,20 +223,28 @@ public class SurveyAnalyticsServiceImpl implements SurveyAnalyticsService {
     }
 
     private void validateDates(LocalDate startDate, LocalDate endDate, Map<String, Object> surveyData) {
-        if (startDate != null && endDate != null) {
-            if (startDate.isAfter(endDate)) {
-                throw new IllegalArgumentException("Start date cannot be after end date");
-            }
+        if (startDate != null && endDate != null && startDate.isAfter(endDate)) {
+            throw new IllegalArgumentException("Start date cannot be after end date");
+        }
 
-            LocalDate validFrom = getLocalDateValue(surveyData, "valid_from");
-            LocalDate validTo = getLocalDateValue(surveyData, "valid_to");
+        LocalDate validFrom = getLocalDateValue(surveyData, "valid_from");
+        LocalDate validTo = getLocalDateValue(surveyData, "valid_to");
 
-            if (validFrom != null && startDate.isBefore(validFrom)) {
+        if (validFrom != null) {
+            if (startDate != null && startDate.isBefore(validFrom)) {
                 throw new IllegalArgumentException("Start date cannot be before survey validity period");
             }
+            if (endDate != null && endDate.isBefore(validFrom)) {
+                throw new IllegalArgumentException("End date cannot be before survey validity period");
+            }
+        }
 
-            if (validTo != null && endDate.isAfter(validTo)) {
+        if (validTo != null) {
+            if (endDate != null && endDate.isAfter(validTo)) {
                 throw new IllegalArgumentException("End date cannot be after survey validity period");
+            }
+            if (startDate != null && startDate.isAfter(validTo)) {
+                throw new IllegalArgumentException("Start date cannot be after survey validity period");
             }
         }
     }
