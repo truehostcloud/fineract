@@ -21,7 +21,7 @@ jobs:
       - name: Modify Email Welcome Message
         run: |
           sed -i 's/Mifos/Jisort/g' fineract-provider/src/main/java/org/apache/fineract/infrastructure/core/service/GmailBackedPlatformEmailService.java
-          sed -i '/You must change this password upon first log in using Uppercase, Lowercase, number and character.\\n/d' fineract-provider/src/main/java/org/apache/fineract/infrastructure/core/service/GmailBackedPlatformEmailService.java
+          sed -i '/You must change this password upon first log in using Uppercase, Lowercase, number and character/d' fineract-provider/src/main/java/org/apache/fineract/infrastructure/core/service/GmailBackedPlatformEmailService.java
           sed -i 's/Mifos/Jisort/g' fineract-provider/src/main/java/org/apache/fineract/portfolio/self/security/service/SelfServicePasswordResetWritePlatformServiceImpl.java
 
       - name: Set up JDK 17

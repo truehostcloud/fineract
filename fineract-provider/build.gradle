@@ -235,19 +235,9 @@ task setBlankPassword {
 }
 
 bootRun {
-
-     def apmAgentPath = System.getenv('ELASTIC_APM_AGENT_PATH')
-    
-    jvmArgs = ["-Dspring.output.ansi.enabled=ALWAYS"]
-    
-    if (apmAgentPath && new File(apmAgentPath).exists()) {
-        jvmArgs += [
-            "-javaagent:${apmAgentPath}",
-            "-Delastic.apm.application_packages=org.apache.fineract",
-            "-Delastic.apm.trace_methods=org.apache.fineract.*,com.acme.fineract.*",
-        ]
-    }
-
+    jvmArgs = [
+        "-Dspring.output.ansi.enabled=ALWAYS"
+    ]
 
     dependencies {
         implementation 'org.mariadb.jdbc:mariadb-java-client'
