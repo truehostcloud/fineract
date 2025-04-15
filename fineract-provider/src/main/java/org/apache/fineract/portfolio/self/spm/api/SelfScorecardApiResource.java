@@ -21,6 +21,9 @@ package org.apache.fineract.portfolio.self.spm.api;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.ArraySchema;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -81,7 +84,7 @@ public class SelfScorecardApiResource {
     @Consumes({ MediaType.APPLICATION_JSON })
     @Produces({ MediaType.APPLICATION_JSON })
     @Transactional
-    @Operation(summary = "Update a Scorecard entry", description = "Update an existing survey response for a client.\n" + "\n"
+    @Operation(summary = "Update a Scorecard entry", description = "Updates the most recent survey submission for a client.\n" + "\n"
             + "Mandatory Fields\n" + "clientId, createdOn, questionId, responseId, staffId")
     @ApiResponses({ @ApiResponse(responseCode = "200", description = "OK") })
     public void updateScorecard(@PathParam("surveyId") @Parameter(description = "Enter surveyId") final Long surveyId,
@@ -96,11 +99,24 @@ public class SelfScorecardApiResource {
     @Consumes({ MediaType.APPLICATION_JSON })
     @Produces({ MediaType.APPLICATION_JSON })
     @Transactional
-    @Operation(summary = "Retrieve most recent survey submission", description = "Retrieves the most recent survey submission for a client to allow updates")
+    @Operation(summary = "Retrieve survey submissions", description = "Retrieves all survey submissions for a client to allow updates")
     public List<ScorecardData> findBySurveyAndClient(@PathParam("surveyId") @Parameter(description = "Enter surveyId") final Long surveyId,
             @PathParam("clientId") @Parameter(description = "Enter clientId") final Long clientId) {
         validateAppuserClientsMapping(clientId);
         return this.scorecardApiResource.findBySurveyAndClient(surveyId, clientId);
+    }
+
+    @GET
+    @Path("clients/{clientId}/surveys")
+    @Consumes({ MediaType.APPLICATION_JSON })
+    @Produces({ MediaType.APPLICATION_JSON })
+    @Transactional
+    @Operation(summary = "View client survey responses", description = "Retrieves the latest survey submissions for a client")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "OK", content = @Content(array = @ArraySchema(schema = @Schema(implementation = ScorecardData.class)))) })
+    public List<ScorecardData> viewClientResponses(@PathParam("clientId") @Parameter(description = "Client ID") final Long clientId) {
+        validateAppuserClientsMapping(clientId);
+        return this.scorecardApiResource.viewClientResponses(clientId);
     }
 
     private void validateAppuserClientsMapping(final Long clientId) {
