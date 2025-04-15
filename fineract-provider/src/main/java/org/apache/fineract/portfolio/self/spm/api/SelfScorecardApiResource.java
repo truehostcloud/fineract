@@ -84,7 +84,7 @@ public class SelfScorecardApiResource {
     @Consumes({ MediaType.APPLICATION_JSON })
     @Produces({ MediaType.APPLICATION_JSON })
     @Transactional
-    @Operation(summary = "Update a Scorecard entry", description = "Updates the most recent survey submission for a client.\n" + "\n"
+    @Operation(summary = "Update a Scorecard entry", description = "Update an existing survey response for a client.\n" + "\n"
             + "Mandatory Fields\n" + "clientId, createdOn, questionId, responseId, staffId")
     @ApiResponses({ @ApiResponse(responseCode = "200", description = "OK") })
     public void updateScorecard(@PathParam("surveyId") @Parameter(description = "Enter surveyId") final Long surveyId,
