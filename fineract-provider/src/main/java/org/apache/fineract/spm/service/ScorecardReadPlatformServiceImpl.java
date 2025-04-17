@@ -136,4 +136,24 @@ public class ScorecardReadPlatformServiceImpl implements ScorecardReadPlatformSe
         return scorecardDatas;
     }
 
+    @Override
+    public Collection<ScorecardData> retrieveScorecardByClientDebug(Long clientId) {
+        this.context.authenticatedUser();
+        ScorecardMapper scm = new ScorecardMapper();
+        // No grouping to get all raw data
+        String sql = "select " + scm.schema() + " where sc.client_id = ? ";
+        Collection<ScorecardData> scorecardDatas = this.jdbcTemplate.query(sql, scm, new Object[] { clientId }); // NOSONAR
+        
+        // Get all scorecard values without filtering
+        for (ScorecardData scorecardData : scorecardDatas) {
+            ScorecardValueMapper scvm = new ScorecardValueMapper();
+            String valueSql = "select " + scvm.schema();
+            List<ScorecardValue> values = this.jdbcTemplate.query(valueSql, scvm, 
+                new Object[] { scorecardData.getSurveyId(), scorecardData.getClientId() });
+            scorecardData.setScorecardValues(values);
+        }
+        
+        return scorecardDatas;
+    }
+
 }

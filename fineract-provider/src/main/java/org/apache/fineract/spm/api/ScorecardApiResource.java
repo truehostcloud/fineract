@@ -40,6 +40,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.apache.fineract.infrastructure.core.exception.PlatformDataIntegrityException;
@@ -58,6 +59,8 @@ import org.apache.fineract.spm.util.ScorecardMapper;
 import org.apache.fineract.useradministration.domain.AppUser;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @Path("/v1/surveys/scorecards")
 @Component
@@ -70,6 +73,7 @@ public class ScorecardApiResource {
     private final ScorecardService scorecardService;
     private final ClientRepositoryWrapper clientRepositoryWrapper;
     private final ScorecardReadPlatformService scorecardReadPlatformService;
+    private static final Logger log = LoggerFactory.getLogger(ScorecardApiResource.class);
 
     @GET
     @Path("{surveyId}")
@@ -208,34 +212,65 @@ public class ScorecardApiResource {
         for (Map.Entry<Long, List<ScorecardData>> entry : submissionsBySurvey.entrySet()) {
             List<ScorecardData> surveySubmissions = entry.getValue();
 
-            OffsetDateTime latestTimestamp = surveySubmissions.stream().flatMap(submission -> submission.getScorecardValues().stream())
-                    .map(ScorecardValue::getCreatedOn).max(OffsetDateTime::compareTo).orElse(null);
+            // Group submissions by their complete submission timestamp
+            Map<OffsetDateTime, List<ScorecardData>> submissionsByTimestamp = surveySubmissions.stream()
+                    .collect(Collectors.groupingBy(submission -> 
+                        submission.getScorecardValues().stream()
+                            .map(ScorecardValue::getCreatedOn)
+                            .findFirst()
+                            .orElse(null)));
+
+            // Find the latest complete submission
+            OffsetDateTime latestTimestamp = submissionsByTimestamp.keySet().stream()
+                    .filter(Objects::nonNull)
+                    .max(OffsetDateTime::compareTo)
+                    .orElse(null);
 
             if (latestTimestamp != null) {
-
-                ScorecardData latestSubmission = surveySubmissions.stream().filter(submission -> submission.getScorecardValues().stream()
-                        .anyMatch(value -> value.getCreatedOn().equals(latestTimestamp))).findFirst().orElse(null);
-
-                if (latestSubmission != null) {
-
-                    List<ScorecardValue> latestValues = surveySubmissions.stream()
+                List<ScorecardData> latestSubmission = submissionsByTimestamp.get(latestTimestamp);
+                if (latestSubmission != null && !latestSubmission.isEmpty()) {
+                    // Create a new ScorecardData with only the values from the latest submission
+                    ScorecardData latestData = latestSubmission.get(0);
+                    List<ScorecardValue> latestValues = latestSubmission.stream()
                             .flatMap(submission -> submission.getScorecardValues().stream())
-                            .filter(value -> value.getCreatedOn().equals(latestTimestamp)).collect(Collectors.toList());
-
+                            .filter(value -> value.getCreatedOn().equals(latestTimestamp))
+                            .collect(Collectors.toList());
+                    
                     ScorecardData completeSubmission = new ScorecardData();
-                    completeSubmission.setId(latestSubmission.getId());
-                    completeSubmission.setUserId(latestSubmission.getUserId());
-                    completeSubmission.setUsername(latestSubmission.getUsername());
-                    completeSubmission.setClientId(latestSubmission.getClientId());
-                    completeSubmission.setSurveyId(latestSubmission.getSurveyId());
-                    completeSubmission.setSurveyName(latestSubmission.getSurveyName());
+                    completeSubmission.setId(latestData.getId());
+                    completeSubmission.setUserId(latestData.getUserId());
+                    completeSubmission.setUsername(latestData.getUsername());
+                    completeSubmission.setClientId(latestData.getClientId());
+                    completeSubmission.setSurveyId(latestData.getSurveyId());
+                    completeSubmission.setSurveyName(latestData.getSurveyName());
                     completeSubmission.setScorecardValues(latestValues);
-
+                    
                     result.add(completeSubmission);
                 }
             }
         }
 
         return result;
+    }
+
+    @GET
+    @Path("clients/{clientId}/surveys/debug")
+    @Consumes({ MediaType.APPLICATION_JSON })
+    @Produces({ MediaType.APPLICATION_JSON })
+    @Transactional
+    @Operation(summary = "Debug endpoint for client survey responses", description = "Returns all survey submissions for a client without filtering")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "OK", content = @Content(array = @ArraySchema(schema = @Schema(implementation = ScorecardData.class)))) })
+    public List<ScorecardData> debugClientResponses(@PathParam("clientId") @Parameter(description = "Client ID") final Long clientId) {
+        this.clientRepositoryWrapper.findOneWithNotFoundDetection(clientId);
+
+        // Get all submissions without any filtering using the debug method
+        Collection<ScorecardData> allSubmissions = this.scorecardReadPlatformService.retrieveScorecardByClientDebug(clientId);
+        
+        // Log the raw data for debugging
+        log.error("Raw submissions for client {}: {}", clientId, allSubmissions);
+        
+        // Return all submissions as is
+        return new ArrayList<>(allSubmissions);
     }
 }
