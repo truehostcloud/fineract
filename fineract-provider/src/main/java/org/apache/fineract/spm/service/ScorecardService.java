@@ -18,6 +18,7 @@
  */
 package org.apache.fineract.spm.service;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -66,6 +67,8 @@ public class ScorecardService {
 
     public List<Scorecard> updateScorecard(final List<Scorecard> scorecards) {
         this.securityContext.authenticatedUser();
+        List<Scorecard> updatedScorecards = new ArrayList<>();
+        
         // Ensure all scorecards have IDs set before saving
         for (Scorecard scorecard : scorecards) {
             if (scorecard.getId() == null) {
@@ -80,9 +83,10 @@ public class ScorecardService {
                 existing.setValue(scorecard.getValue());
                 existing.setQuestion(scorecard.getQuestion());
                 existing.setResponse(scorecard.getResponse());
+                updatedScorecards.add(existing);  // Add the updated scorecard to our list
             }
         }
         // Save all updates in a single transaction
-        return this.scorecardRepository.saveAll(scorecards);
+        return this.scorecardRepository.saveAll(updatedScorecards);
     }
 }
