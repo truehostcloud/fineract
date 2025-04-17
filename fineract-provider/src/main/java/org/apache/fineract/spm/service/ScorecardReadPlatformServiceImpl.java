@@ -129,9 +129,12 @@ public class ScorecardReadPlatformServiceImpl implements ScorecardReadPlatformSe
     public Collection<ScorecardData> retrieveScorecardBySurveyAndClient(Long surveyId, Long clientId) {
         this.context.authenticatedUser();
         ScorecardMapper scm = new ScorecardMapper();
-        String sql = "select " + scm.schema() + " where sc.survey_id = ? and sc.client_id = ? "
-                + " group by sc.survey_id, sc.client_id, sc.id ";
-        Collection<ScorecardData> scorecardDatas = this.jdbcTemplate.query(sql, scm, new Object[] { surveyId, clientId }); // NOSONAR
+        String sql = "select " + scm.schema() + 
+                    " where sc.survey_id = ? and sc.client_id = ? " +
+                    " and sc.created_on = (select max(created_on) from m_survey_scorecards " +
+                    " where survey_id = ? and client_id = ?) " +
+                    " group by sc.survey_id, sc.client_id, sc.user_id, sc.created_on ";
+        Collection<ScorecardData> scorecardDatas = this.jdbcTemplate.query(sql, scm, new Object[] { surveyId, clientId, surveyId, clientId }); // NOSONAR
         updateScorecardValues(scorecardDatas);
         return scorecardDatas;
     }

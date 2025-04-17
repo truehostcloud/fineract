@@ -146,42 +146,62 @@ public class ScorecardApiResource {
             @ApiResponse(responseCode = "400", description = "Invalid request data"),
             @ApiResponse(responseCode = "404", description = "Survey or client not found"),
             @ApiResponse(responseCode = "409", description = "Survey not submitted yet") })
-    public List<ScorecardData> updateScorecard(@PathParam("surveyId") @Parameter(description = "Survey ID") final Long surveyId,
-            @PathParam("clientId") @Parameter(description = "Client ID") final Long clientId,
-            @Parameter(description = "Scorecard data to update") final ScorecardData scorecardData) {
+    public List<ScorecardData> updateScorecard(@PathParam("surveyId") final Long surveyId,
+            @PathParam("clientId") final Long clientId,
+            final ScorecardData scorecardData) {
         this.securityContext.authenticatedUser();
         final Survey survey = this.spmService.findById(surveyId);
         final Client client = this.clientRepositoryWrapper.findOneWithNotFoundDetection(clientId);
 
+        log.info("Starting update for survey {} and client {}", surveyId, clientId);
+        log.info("Received scorecard values: {}", scorecardData.getScorecardValues());
+
+        // Get all existing scorecards for this survey and client
         List<Scorecard> existingScorecards = this.scorecardService.findBySurveyAndClient(survey, client);
+        log.info("Found {} existing scorecards", existingScorecards.size());
+
         if (existingScorecards.isEmpty()) {
-            throw new PlatformDataIntegrityException("error.msg.survey.not.submitted", "Client has not submitted this survey yet",
-                    "clientId", client.getId());
+            throw new PlatformDataIntegrityException("error.msg.survey.not.submitted", 
+                    "Client has not submitted this survey yet", "clientId", client.getId());
         }
 
-        LocalDateTime latestSubmissionTime = existingScorecards.stream().map(Scorecard::getCreatedOn).max(LocalDateTime::compareTo)
+        // Find the latest submission timestamp
+        LocalDateTime latestSubmissionTime = existingScorecards.stream()
+                .map(Scorecard::getCreatedOn)
+                .max(LocalDateTime::compareTo)
                 .orElseThrow(() -> new PlatformDataIntegrityException("error.msg.survey.no.timestamp",
                         "No timestamp found for survey submission", "clientId", client.getId()));
+        log.info("Latest submission time: {}", latestSubmissionTime);
 
+        // Get only the scorecards from the latest submission
         List<Scorecard> latestSubmissionScorecards = existingScorecards.stream()
-                .filter(sc -> sc.getCreatedOn().equals(latestSubmissionTime)).collect(Collectors.toList());
+                .filter(sc -> sc.getCreatedOn().equals(latestSubmissionTime))
+                .collect(Collectors.toList());
+        log.info("Found {} scorecards from latest submission", latestSubmissionScorecards.size());
 
-        Map<Long, Scorecard> latestScorecardsByQuestion = latestSubmissionScorecards.stream()
+        // Create a map of existing scorecards by question ID
+        Map<Long, Scorecard> existingScorecardsByQuestion = latestSubmissionScorecards.stream()
                 .collect(Collectors.toMap(sc -> sc.getQuestion().getId(), sc -> sc));
+        log.info("Mapped scorecards by question ID: {}", existingScorecardsByQuestion.keySet());
 
-        List<Scorecard> updatedScorecards = new ArrayList<>();
+        // Update the scorecards
         for (ScorecardValue newValue : scorecardData.getScorecardValues()) {
-            Scorecard existingScorecard = latestScorecardsByQuestion.get(newValue.getQuestionId());
+            log.info("Processing update for question {} with value {}", newValue.getQuestionId(), newValue.getValue());
+            Scorecard existingScorecard = existingScorecardsByQuestion.get(newValue.getQuestionId());
             if (existingScorecard != null) {
-
+                log.info("Found existing scorecard for question {}", newValue.getQuestionId());
                 existingScorecard.setResponse(this.findResponseById(survey, newValue.getResponseId()));
                 existingScorecard.setValue(newValue.getValue());
-                updatedScorecards.add(existingScorecard);
+            } else {
+                log.warn("No existing scorecard found for question {}", newValue.getQuestionId());
             }
         }
 
-        this.scorecardService.updateScorecard(updatedScorecards);
-
+        // Save the updates
+        List<Scorecard> updatedScorecards = this.scorecardService.updateScorecard(latestSubmissionScorecards);
+        log.info("Updated {} scorecards", updatedScorecards.size());
+        
+        // Return the updated data
         return (List<ScorecardData>) this.scorecardReadPlatformService.retrieveScorecardBySurveyAndClient(surveyId, clientId);
     }
 
@@ -212,47 +232,37 @@ public class ScorecardApiResource {
         for (Map.Entry<Long, List<ScorecardData>> entry : submissionsBySurvey.entrySet()) {
             List<ScorecardData> surveySubmissions = entry.getValue();
 
-            // Group submissions by their complete submission timestamp
-            Map<OffsetDateTime, List<ScorecardData>> submissionsByTimestamp = surveySubmissions.stream()
-                    .collect(Collectors.groupingBy(submission -> 
-                        submission.getScorecardValues().stream()
-                            .map(ScorecardValue::getCreatedOn)
-                            .findFirst()
-                            .orElse(null)));
+            // Flatten all scorecard values from all submissions
+            List<ScorecardValue> allValues = surveySubmissions.stream()
+                    .flatMap(submission -> submission.getScorecardValues().stream())
+                    .collect(Collectors.toList());
 
-            // Find the latest complete submission
-            OffsetDateTime latestTimestamp = submissionsByTimestamp.keySet().stream()
-                    .filter(Objects::nonNull)
-                    .max(OffsetDateTime::compareTo)
-                    .orElse(null);
+            // Group values by questionId and get the latest value for each question
+            Map<Long, ScorecardValue> latestValuesByQuestion = allValues.stream()
+                    .collect(Collectors.toMap(
+                        ScorecardValue::getQuestionId,
+                        value -> value,
+                        (v1, v2) -> v1.getCreatedOn().isAfter(v2.getCreatedOn()) ? v1 : v2
+                    ));
 
-            if (latestTimestamp != null) {
-                List<ScorecardData> latestSubmission = submissionsByTimestamp.get(latestTimestamp);
-                if (latestSubmission != null && !latestSubmission.isEmpty()) {
-                    // Create a new ScorecardData with only the values from the latest submission
-                    ScorecardData latestData = latestSubmission.get(0);
-                    List<ScorecardValue> latestValues = latestSubmission.stream()
-                            .flatMap(submission -> submission.getScorecardValues().stream())
-                            .filter(value -> value.getCreatedOn().equals(latestTimestamp))
-                            .collect(Collectors.toList());
-                    
-                    ScorecardData completeSubmission = new ScorecardData();
-                    completeSubmission.setId(latestData.getId());
-                    completeSubmission.setUserId(latestData.getUserId());
-                    completeSubmission.setUsername(latestData.getUsername());
-                    completeSubmission.setClientId(latestData.getClientId());
-                    completeSubmission.setSurveyId(latestData.getSurveyId());
-                    completeSubmission.setSurveyName(latestData.getSurveyName());
-                    completeSubmission.setScorecardValues(latestValues);
-                    
-                    result.add(completeSubmission);
-                }
+            // Create a new ScorecardData with the latest values for each question
+            if (!latestValuesByQuestion.isEmpty()) {
+                ScorecardData completeSubmission = new ScorecardData();
+                completeSubmission.setId(surveySubmissions.get(0).getId());
+                completeSubmission.setUserId(surveySubmissions.get(0).getUserId());
+                completeSubmission.setUsername(surveySubmissions.get(0).getUsername());
+                completeSubmission.setClientId(surveySubmissions.get(0).getClientId());
+                completeSubmission.setSurveyId(surveySubmissions.get(0).getSurveyId());
+                completeSubmission.setSurveyName(surveySubmissions.get(0).getSurveyName());
+                completeSubmission.setScorecardValues(new ArrayList<>(latestValuesByQuestion.values()));
+                
+                result.add(completeSubmission);
             }
         }
 
         return result;
     }
-
+    
     @GET
     @Path("clients/{clientId}/surveys/debug")
     @Consumes({ MediaType.APPLICATION_JSON })

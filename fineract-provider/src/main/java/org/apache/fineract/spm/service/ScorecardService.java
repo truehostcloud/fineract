@@ -19,12 +19,20 @@
 package org.apache.fineract.spm.service;
 
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.apache.fineract.infrastructure.security.service.PlatformSecurityContext;
+import org.apache.fineract.infrastructure.core.exception.PlatformDataIntegrityException;
 import org.apache.fineract.portfolio.client.domain.Client;
+import org.apache.fineract.spm.data.ScorecardData;
+import org.apache.fineract.spm.data.ScorecardValue;
 import org.apache.fineract.spm.domain.Scorecard;
 import org.apache.fineract.spm.domain.ScorecardRepository;
 import org.apache.fineract.spm.domain.Survey;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.stereotype.Service;
 
 @RequiredArgsConstructor
 public class ScorecardService {
@@ -58,6 +66,23 @@ public class ScorecardService {
 
     public List<Scorecard> updateScorecard(final List<Scorecard> scorecards) {
         this.securityContext.authenticatedUser();
+        // Ensure all scorecards have IDs set before saving
+        for (Scorecard scorecard : scorecards) {
+            if (scorecard.getId() == null) {
+                throw new PlatformDataIntegrityException("error.msg.survey.scorecard.no.id", 
+                    "Scorecard must have an ID to be updated", "scorecard", scorecard);
+            }
+            // Fetch the existing scorecard to ensure we're updating the correct one
+            Optional<Scorecard> existingScorecard = this.scorecardRepository.findById(scorecard.getId());
+            if (existingScorecard.isPresent()) {
+                // Update the values of the existing scorecard
+                Scorecard existing = existingScorecard.get();
+                existing.setValue(scorecard.getValue());
+                existing.setQuestion(scorecard.getQuestion());
+                existing.setResponse(scorecard.getResponse());
+            }
+        }
+        // Save all updates in a single transaction
         return this.scorecardRepository.saveAll(scorecards);
     }
 }
