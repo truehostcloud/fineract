@@ -33,6 +33,7 @@ import org.apache.fineract.spm.data.ScorecardValue;
 import org.apache.fineract.spm.domain.Scorecard;
 import org.apache.fineract.spm.domain.ScorecardRepository;
 import org.apache.fineract.spm.domain.Survey;
+import org.apache.fineract.spm.domain.Response;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
@@ -97,13 +98,24 @@ public class ScorecardService {
         for (Scorecard newScorecard : scorecards) {
             Scorecard existingScorecard = existingScorecardsByQuestion.get(newScorecard.getQuestion().getId());
             if (existingScorecard != null) {
-                existingScorecard.setResponse(newScorecard.getResponse());
+                // Find the response in the survey's questions
+                Response newResponse = survey.getQuestions().stream()
+                    .filter(q -> q.getId().equals(newScorecard.getQuestion().getId()))
+                    .flatMap(q -> q.getResponses().stream())
+                    .filter(r -> r.getId().equals(newScorecard.getResponse().getId()))
+                    .findFirst()
+                    .orElseThrow(() -> new PlatformDataIntegrityException("error.msg.survey.response.not.found", 
+                        "Response not found for question", "questionId", newScorecard.getQuestion().getId()));
+                
+                // Update the existing scorecard with new values
+                existingScorecard.setResponse(newResponse);
                 existingScorecard.setValue(newScorecard.getValue());
+                // Save each update individually to ensure it's persisted
+                existingScorecard = this.scorecardRepository.save(existingScorecard);
                 updatedScorecards.add(existingScorecard);
             }
         }
         
-        // Save all updates in a single transaction
-        return this.scorecardRepository.saveAll(updatedScorecards);
+        return updatedScorecards;
     }
 }
