@@ -69,53 +69,6 @@ public class ScorecardService {
 
     public List<Scorecard> updateScorecard(final List<Scorecard> scorecards) {
         this.securityContext.authenticatedUser();
-        List<Scorecard> updatedScorecards = new ArrayList<>();
-        
-        // Get the survey and client from the first scorecard (they should be the same for all)
-        Survey survey = scorecards.get(0).getSurvey();
-        Client client = scorecards.get(0).getClient();
-        
-        // Get existing scorecards for this survey and client
-        List<Scorecard> existingScorecards = this.scorecardRepository.findBySurveyAndClient(survey, client);
-        
-        // Find the latest submission timestamp
-        LocalDateTime latestSubmissionTime = existingScorecards.stream()
-                .map(Scorecard::getCreatedOn)
-                .max(LocalDateTime::compareTo)
-                .orElseThrow(() -> new PlatformDataIntegrityException("error.msg.survey.no.timestamp",
-                        "No timestamp found for survey submission", "clientId", client.getId()));
-        
-        // Get only the scorecards from the latest submission
-        List<Scorecard> latestSubmissionScorecards = existingScorecards.stream()
-                .filter(sc -> sc.getCreatedOn().equals(latestSubmissionTime))
-                .collect(Collectors.toList());
-        
-        // Create a map of existing scorecards by question ID
-        Map<Long, Scorecard> existingScorecardsByQuestion = latestSubmissionScorecards.stream()
-                .collect(Collectors.toMap(sc -> sc.getQuestion().getId(), sc -> sc));
-        
-        // Update the scorecards
-        for (Scorecard newScorecard : scorecards) {
-            Scorecard existingScorecard = existingScorecardsByQuestion.get(newScorecard.getQuestion().getId());
-            if (existingScorecard != null) {
-                // Find the response in the survey's questions
-                Response newResponse = survey.getQuestions().stream()
-                    .filter(q -> q.getId().equals(newScorecard.getQuestion().getId()))
-                    .flatMap(q -> q.getResponses().stream())
-                    .filter(r -> r.getId().equals(newScorecard.getResponse().getId()))
-                    .findFirst()
-                    .orElseThrow(() -> new PlatformDataIntegrityException("error.msg.survey.response.not.found", 
-                        "Response not found for question", "questionId", newScorecard.getQuestion().getId()));
-                
-                // Update the existing scorecard with new values
-                existingScorecard.setResponse(newResponse);
-                existingScorecard.setValue(newScorecard.getValue());
-                // Save each update individually to ensure it's persisted
-                existingScorecard = this.scorecardRepository.save(existingScorecard);
-                updatedScorecards.add(existingScorecard);
-            }
-        }
-        
-        return updatedScorecards;
+        return this.scorecardRepository.saveAll(scorecards);
     }
 }

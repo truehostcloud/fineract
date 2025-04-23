@@ -146,65 +146,45 @@ public class ScorecardApiResource {
             @ApiResponse(responseCode = "400", description = "Invalid request data"),
             @ApiResponse(responseCode = "404", description = "Survey or client not found"),
             @ApiResponse(responseCode = "409", description = "Survey not submitted yet") })
-    public List<ScorecardData> updateScorecard(@PathParam("surveyId") final Long surveyId,
-            @PathParam("clientId") final Long clientId,
-            final ScorecardData scorecardData) {
+            public List<ScorecardData> updateScorecard(@PathParam("surveyId") @Parameter(description = "Survey ID") final Long surveyId,
+            @PathParam("clientId") @Parameter(description = "Client ID") final Long clientId,
+            @Parameter(description = "Scorecard data to update") final ScorecardData scorecardData) {
         this.securityContext.authenticatedUser();
         final Survey survey = this.spmService.findById(surveyId);
         final Client client = this.clientRepositoryWrapper.findOneWithNotFoundDetection(clientId);
 
-        log.info("Starting update for survey {} and client {}", surveyId, clientId);
-        log.info("Received scorecard values: {}", scorecardData.getScorecardValues());
-
-        // Get all existing scorecards for this survey and client
         List<Scorecard> existingScorecards = this.scorecardService.findBySurveyAndClient(survey, client);
-        log.info("Found {} existing scorecards", existingScorecards.size());
-
         if (existingScorecards.isEmpty()) {
-            throw new PlatformDataIntegrityException("error.msg.survey.not.submitted", 
-                    "Client has not submitted this survey yet", "clientId", client.getId());
+            throw new PlatformDataIntegrityException("error.msg.survey.not.submitted", "Client has not submitted this survey yet",
+                    "clientId", client.getId());
         }
 
-        // Find the latest submission timestamp
-        LocalDateTime latestSubmissionTime = existingScorecards.stream()
-                .map(Scorecard::getCreatedOn)
-                .max(LocalDateTime::compareTo)
+        LocalDateTime latestSubmissionTime = existingScorecards.stream().map(Scorecard::getCreatedOn).max(LocalDateTime::compareTo)
                 .orElseThrow(() -> new PlatformDataIntegrityException("error.msg.survey.no.timestamp",
                         "No timestamp found for survey submission", "clientId", client.getId()));
-        log.info("Latest submission time: {}", latestSubmissionTime);
 
-        // Get only the scorecards from the latest submission
         List<Scorecard> latestSubmissionScorecards = existingScorecards.stream()
-                .filter(sc -> sc.getCreatedOn().equals(latestSubmissionTime))
-                .collect(Collectors.toList());
-        log.info("Found {} scorecards from latest submission", latestSubmissionScorecards.size());
+                .filter(sc -> sc.getCreatedOn().equals(latestSubmissionTime)).collect(Collectors.toList());
 
-        // Create a map of existing scorecards by question ID
-        Map<Long, Scorecard> existingScorecardsByQuestion = latestSubmissionScorecards.stream()
+        Map<Long, Scorecard> latestScorecardsByQuestion = latestSubmissionScorecards.stream()
                 .collect(Collectors.toMap(sc -> sc.getQuestion().getId(), sc -> sc));
-        log.info("Mapped scorecards by question ID: {}", existingScorecardsByQuestion.keySet());
 
-        // Update the scorecards
+        List<Scorecard> updatedScorecards = new ArrayList<>();
         for (ScorecardValue newValue : scorecardData.getScorecardValues()) {
-            log.info("Processing update for question {} with value {}", newValue.getQuestionId(), newValue.getValue());
-            Scorecard existingScorecard = existingScorecardsByQuestion.get(newValue.getQuestionId());
+            Scorecard existingScorecard = latestScorecardsByQuestion.get(newValue.getQuestionId());
             if (existingScorecard != null) {
-                log.info("Found existing scorecard for question {}", newValue.getQuestionId());
+
                 existingScorecard.setResponse(this.findResponseById(survey, newValue.getResponseId()));
                 existingScorecard.setValue(newValue.getValue());
-            } else {
-                log.warn("No existing scorecard found for question {}", newValue.getQuestionId());
+                updatedScorecards.add(existingScorecard);
             }
         }
 
-        // Save the updates
-        List<Scorecard> updatedScorecards = this.scorecardService.updateScorecard(latestSubmissionScorecards);
-        log.info("Updated {} scorecards", updatedScorecards.size());
-        
-        // Return the updated data
+        this.scorecardService.updateScorecard(updatedScorecards);
+
         return (List<ScorecardData>) this.scorecardReadPlatformService.retrieveScorecardBySurveyAndClient(surveyId, clientId);
     }
-
+  
     private Response findResponseById(Survey survey, Long responseId) {
         return survey.getQuestions().stream().flatMap(q -> q.getResponses().stream()).filter(r -> r.getId().equals(responseId)).findFirst()
                 .orElseThrow(() -> new PlatformDataIntegrityException("error.msg.survey.response.not.found", "Response not found",
