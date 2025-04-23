@@ -18,6 +18,7 @@
  */
 package org.apache.fineract.spm.service;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -69,23 +70,39 @@ public class ScorecardService {
         this.securityContext.authenticatedUser();
         List<Scorecard> updatedScorecards = new ArrayList<>();
         
-        // Ensure all scorecards have IDs set before saving
-        for (Scorecard scorecard : scorecards) {
-            if (scorecard.getId() == null) {
-                throw new PlatformDataIntegrityException("error.msg.survey.scorecard.no.id", 
-                    "Scorecard must have an ID to be updated", "scorecard", scorecard);
-            }
-            // Fetch the existing scorecard to ensure we're updating the correct one
-            Optional<Scorecard> existingScorecard = this.scorecardRepository.findById(scorecard.getId());
-            if (existingScorecard.isPresent()) {
-                // Update the values of the existing scorecard
-                Scorecard existing = existingScorecard.get();
-                existing.setValue(scorecard.getValue());
-                existing.setQuestion(scorecard.getQuestion());
-                existing.setResponse(scorecard.getResponse());
-                updatedScorecards.add(existing);  // Add the updated scorecard to our list
+        // Get the survey and client from the first scorecard (they should be the same for all)
+        Survey survey = scorecards.get(0).getSurvey();
+        Client client = scorecards.get(0).getClient();
+        
+        // Get existing scorecards for this survey and client
+        List<Scorecard> existingScorecards = this.scorecardRepository.findBySurveyAndClient(survey, client);
+        
+        // Find the latest submission timestamp
+        LocalDateTime latestSubmissionTime = existingScorecards.stream()
+                .map(Scorecard::getCreatedOn)
+                .max(LocalDateTime::compareTo)
+                .orElseThrow(() -> new PlatformDataIntegrityException("error.msg.survey.no.timestamp",
+                        "No timestamp found for survey submission", "clientId", client.getId()));
+        
+        // Get only the scorecards from the latest submission
+        List<Scorecard> latestSubmissionScorecards = existingScorecards.stream()
+                .filter(sc -> sc.getCreatedOn().equals(latestSubmissionTime))
+                .collect(Collectors.toList());
+        
+        // Create a map of existing scorecards by question ID
+        Map<Long, Scorecard> existingScorecardsByQuestion = latestSubmissionScorecards.stream()
+                .collect(Collectors.toMap(sc -> sc.getQuestion().getId(), sc -> sc));
+        
+        // Update the scorecards
+        for (Scorecard newScorecard : scorecards) {
+            Scorecard existingScorecard = existingScorecardsByQuestion.get(newScorecard.getQuestion().getId());
+            if (existingScorecard != null) {
+                existingScorecard.setResponse(newScorecard.getResponse());
+                existingScorecard.setValue(newScorecard.getValue());
+                updatedScorecards.add(existingScorecard);
             }
         }
+        
         // Save all updates in a single transaction
         return this.scorecardRepository.saveAll(updatedScorecards);
     }
