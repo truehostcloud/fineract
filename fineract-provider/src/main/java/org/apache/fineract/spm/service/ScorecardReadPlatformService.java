@@ -28,6 +28,4 @@ public interface ScorecardReadPlatformService {
     Collection<ScorecardData> retrieveScorecardBySurveyAndClient(Long surveyId, Long clientId);
 
     Collection<ScorecardData> retrieveScorecardBySurvey(Long surveyId);
-
-    Collection<ScorecardData> retrieveScorecardByClientDebug(Long clientId);
 }

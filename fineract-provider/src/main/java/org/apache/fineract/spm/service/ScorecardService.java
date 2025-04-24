@@ -6,9 +6,9 @@
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License. You may obtain a copy of the License at
- *
+ * <p>
  * http://www.apache.org/licenses/LICENSE-2.0
- *
+ * <p>
  * Unless required by applicable law or agreed to in writing,
  * software distributed under the License is distributed on an
  * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
@@ -18,26 +18,20 @@
  */
 package org.apache.fineract.spm.service;
 
-import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
-import org.apache.fineract.infrastructure.security.service.PlatformSecurityContext;
 import org.apache.fineract.infrastructure.core.exception.PlatformDataIntegrityException;
+import org.apache.fineract.infrastructure.security.service.PlatformSecurityContext;
 import org.apache.fineract.portfolio.client.domain.Client;
 import org.apache.fineract.spm.data.ScorecardData;
 import org.apache.fineract.spm.data.ScorecardValue;
-import org.apache.fineract.spm.domain.Scorecard;
-import org.apache.fineract.spm.domain.ScorecardRepository;
-import org.apache.fineract.spm.domain.Survey;
-import org.apache.fineract.spm.domain.Response;
-import org.apache.fineract.spm.domain.Question;
+import org.apache.fineract.spm.domain.*;
 import org.apache.fineract.useradministration.domain.AppUser;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
+
+import java.time.LocalDateTime;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
@@ -45,7 +39,6 @@ public class ScorecardService {
 
     private final PlatformSecurityContext securityContext;
     private final ScorecardRepository scorecardRepository;
-    private final JdbcTemplate jdbcTemplate;
     private final ScorecardReadPlatformService scorecardReadPlatformService;
 
     public List<Scorecard> createScorecard(final List<Scorecard> scorecards) {
@@ -73,18 +66,14 @@ public class ScorecardService {
     }
 
     public ScorecardData updateScorecardResponses(Survey survey, Client client, AppUser appUser, ScorecardData scorecardData) {
-        // Get existing scorecards for this survey and client
         List<Scorecard> existingScorecards = scorecardRepository.findBySurveyAndClient(survey, client);
-        
-        // Process each updated response
+
         for (ScorecardValue updatedValue : scorecardData.getScorecardValues()) {
-            // Find the most recent scorecard for this question
             Optional<Scorecard> existingScorecard = existingScorecards.stream()
-                .filter(sc -> sc.getQuestion().getId().equals(updatedValue.getQuestionId()))
-                .max(Comparator.comparing(Scorecard::getCreatedOn));
-            
+                    .filter(sc -> sc.getQuestion().getId().equals(updatedValue.getQuestionId()))
+                    .max(Comparator.comparing(Scorecard::getCreatedOn));
+
             if (existingScorecard.isPresent()) {
-                // Update existing scorecard
                 Scorecard scorecard = existingScorecard.get();
                 Response response = new Response();
                 response.setId(updatedValue.getResponseId());
@@ -93,7 +82,6 @@ public class ScorecardService {
                 scorecard.setCreatedOn(LocalDateTime.now());
                 scorecardRepository.save(scorecard);
             } else {
-                // Create new scorecard if it doesn't exist
                 Scorecard newScorecard = new Scorecard();
                 newScorecard.setSurvey(survey);
                 Question question = new Question();
@@ -109,12 +97,11 @@ public class ScorecardService {
                 scorecardRepository.save(newScorecard);
             }
         }
-        
-        // Return updated scorecard data
+
         return scorecardReadPlatformService.retrieveScorecardBySurveyAndClient(survey.getId(), client.getId())
-            .stream()
-            .findFirst()
-            .orElseThrow(() -> new PlatformDataIntegrityException("error.msg.survey.update.failed", 
-                "Failed to update survey responses", "surveyId", survey.getId()));
+                .stream()
+                .findFirst()
+                .orElseThrow(() -> new PlatformDataIntegrityException("error.msg.survey.update.failed",
+                        "Failed to update survey responses", "surveyId", survey.getId()));
     }
 }

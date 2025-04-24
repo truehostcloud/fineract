@@ -134,29 +134,9 @@ public class ScorecardReadPlatformServiceImpl implements ScorecardReadPlatformSe
                     " and sc.created_on = (select max(created_on) from m_survey_scorecards " +
                     " where survey_id = ? and client_id = ?) " +
                     " group by sc.survey_id, sc.client_id, sc.user_id, sc.created_on ";
-        Collection<ScorecardData> scorecardDatas = this.jdbcTemplate.query(sql, scm, new Object[] { surveyId, clientId, surveyId, clientId }); // NOSONAR
-        updateScorecardValues(scorecardDatas);
-        return scorecardDatas;
-    }
-
-    @Override
-    public Collection<ScorecardData> retrieveScorecardByClientDebug(Long clientId) {
-        this.context.authenticatedUser();
-        ScorecardMapper scm = new ScorecardMapper();
-        // No grouping to get all raw data
-        String sql = "select " + scm.schema() + " where sc.client_id = ? ";
-        Collection<ScorecardData> scorecardDatas = this.jdbcTemplate.query(sql, scm, new Object[] { clientId }); // NOSONAR
-        
-        // Get all scorecard values without filtering
-        for (ScorecardData scorecardData : scorecardDatas) {
-            ScorecardValueMapper scvm = new ScorecardValueMapper();
-            String valueSql = "select " + scvm.schema();
-            List<ScorecardValue> values = this.jdbcTemplate.query(valueSql, scvm, 
-                new Object[] { scorecardData.getSurveyId(), scorecardData.getClientId() });
-            scorecardData.setScorecardValues(values);
-        }
-        
-        return scorecardDatas;
+        Collection<ScorecardData> scorecardData = this.jdbcTemplate.query(sql, scm, surveyId, clientId, surveyId, clientId); // NOSONAR
+        updateScorecardValues(scorecardData);
+        return scorecardData;
     }
 
 }

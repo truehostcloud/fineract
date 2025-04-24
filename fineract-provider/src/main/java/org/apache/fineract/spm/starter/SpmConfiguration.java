@@ -52,9 +52,8 @@ public class SpmConfiguration {
     @ConditionalOnMissingBean(ScorecardService.class)
     public ScorecardService scorecardService(final PlatformSecurityContext securityContext,
             final ScorecardRepository scorecardRepository,
-            final JdbcTemplate jdbcTemplate,
             final ScorecardReadPlatformService scorecardReadPlatformService) {
-        return new ScorecardService(securityContext, scorecardRepository, jdbcTemplate, scorecardReadPlatformService);
+        return new ScorecardService(securityContext, scorecardRepository, scorecardReadPlatformService);
     }
 
     @Bean
