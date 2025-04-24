@@ -81,7 +81,7 @@ public class ScorecardService {
             // Find the most recent scorecard for this question
             Optional<Scorecard> existingScorecard = existingScorecards.stream()
                 .filter(sc -> sc.getQuestion().getId().equals(updatedValue.getQuestionId()))
-                .max((sc1, sc2) -> sc1.getCreatedOn().compareTo(sc2.getCreatedOn()));
+                .max(Comparator.comparing(Scorecard::getCreatedOn));
             
             if (existingScorecard.isPresent()) {
                 // Update existing scorecard
