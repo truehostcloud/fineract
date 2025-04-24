@@ -34,14 +34,19 @@ import org.apache.fineract.spm.domain.Scorecard;
 import org.apache.fineract.spm.domain.ScorecardRepository;
 import org.apache.fineract.spm.domain.Survey;
 import org.apache.fineract.spm.domain.Response;
+import org.apache.fineract.spm.domain.Question;
+import org.apache.fineract.useradministration.domain.AppUser;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
+@Service
 @RequiredArgsConstructor
 public class ScorecardService {
 
     private final PlatformSecurityContext securityContext;
     private final ScorecardRepository scorecardRepository;
+    private final JdbcTemplate jdbcTemplate;
+    private final ScorecardReadPlatformService scorecardReadPlatformService;
 
     public List<Scorecard> createScorecard(final List<Scorecard> scorecards) {
         this.securityContext.authenticatedUser();
@@ -67,8 +72,49 @@ public class ScorecardService {
         return !existingSubmissions.isEmpty();
     }
 
-    public List<Scorecard> updateScorecard(final List<Scorecard> scorecards) {
-        this.securityContext.authenticatedUser();
-        return this.scorecardRepository.saveAll(scorecards);
+    public ScorecardData updateScorecardResponses(Survey survey, Client client, AppUser appUser, ScorecardData scorecardData) {
+        // Get existing scorecards for this survey and client
+        List<Scorecard> existingScorecards = scorecardRepository.findBySurveyAndClient(survey, client);
+        
+        // Process each updated response
+        for (ScorecardValue updatedValue : scorecardData.getScorecardValues()) {
+            // Find the most recent scorecard for this question
+            Optional<Scorecard> existingScorecard = existingScorecards.stream()
+                .filter(sc -> sc.getQuestion().getId().equals(updatedValue.getQuestionId()))
+                .max((sc1, sc2) -> sc1.getCreatedOn().compareTo(sc2.getCreatedOn()));
+            
+            if (existingScorecard.isPresent()) {
+                // Update existing scorecard
+                Scorecard scorecard = existingScorecard.get();
+                Response response = new Response();
+                response.setId(updatedValue.getResponseId());
+                scorecard.setResponse(response);
+                scorecard.setValue(updatedValue.getValue());
+                scorecard.setCreatedOn(LocalDateTime.now());
+                scorecardRepository.save(scorecard);
+            } else {
+                // Create new scorecard if it doesn't exist
+                Scorecard newScorecard = new Scorecard();
+                newScorecard.setSurvey(survey);
+                Question question = new Question();
+                question.setId(updatedValue.getQuestionId());
+                newScorecard.setQuestion(question);
+                Response response = new Response();
+                response.setId(updatedValue.getResponseId());
+                newScorecard.setResponse(response);
+                newScorecard.setClient(client);
+                newScorecard.setAppUser(appUser);
+                newScorecard.setValue(updatedValue.getValue());
+                newScorecard.setCreatedOn(LocalDateTime.now());
+                scorecardRepository.save(newScorecard);
+            }
+        }
+        
+        // Return updated scorecard data
+        return scorecardReadPlatformService.retrieveScorecardBySurveyAndClient(survey.getId(), client.getId())
+            .stream()
+            .findFirst()
+            .orElseThrow(() -> new PlatformDataIntegrityException("error.msg.survey.update.failed", 
+                "Failed to update survey responses", "surveyId", survey.getId()));
     }
 }

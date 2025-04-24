@@ -136,60 +136,6 @@ public class ScorecardApiResource {
         return (List<ScorecardData>) this.scorecardReadPlatformService.retrieveScorecardByClient(clientId);
     }
 
-    @PUT
-    @Path("{surveyId}/clients/{clientId}")
-    @Consumes({ MediaType.APPLICATION_JSON })
-    @Produces({ MediaType.APPLICATION_JSON })
-    @Transactional
-    @Operation(summary = "Update a Scorecard entry", description = "Updates the most recent survey submission for a client.", responses = {
-            @ApiResponse(responseCode = "200", description = "Scorecard updated successfully"),
-            @ApiResponse(responseCode = "400", description = "Invalid request data"),
-            @ApiResponse(responseCode = "404", description = "Survey or client not found"),
-            @ApiResponse(responseCode = "409", description = "Survey not submitted yet") })
-            public List<ScorecardData> updateScorecard(@PathParam("surveyId") @Parameter(description = "Survey ID") final Long surveyId,
-            @PathParam("clientId") @Parameter(description = "Client ID") final Long clientId,
-            @Parameter(description = "Scorecard data to update") final ScorecardData scorecardData) {
-        this.securityContext.authenticatedUser();
-        final Survey survey = this.spmService.findById(surveyId);
-        final Client client = this.clientRepositoryWrapper.findOneWithNotFoundDetection(clientId);
-
-        List<Scorecard> existingScorecards = this.scorecardService.findBySurveyAndClient(survey, client);
-        if (existingScorecards.isEmpty()) {
-            throw new PlatformDataIntegrityException("error.msg.survey.not.submitted", "Client has not submitted this survey yet",
-                    "clientId", client.getId());
-        }
-
-        LocalDateTime latestSubmissionTime = existingScorecards.stream().map(Scorecard::getCreatedOn).max(LocalDateTime::compareTo)
-                .orElseThrow(() -> new PlatformDataIntegrityException("error.msg.survey.no.timestamp",
-                        "No timestamp found for survey submission", "clientId", client.getId()));
-
-        List<Scorecard> latestSubmissionScorecards = existingScorecards.stream()
-                .filter(sc -> sc.getCreatedOn().equals(latestSubmissionTime)).collect(Collectors.toList());
-
-        Map<Long, Scorecard> latestScorecardsByQuestion = latestSubmissionScorecards.stream()
-                .collect(Collectors.toMap(sc -> sc.getQuestion().getId(), sc -> sc));
-
-        List<Scorecard> updatedScorecards = new ArrayList<>();
-        for (ScorecardValue newValue : scorecardData.getScorecardValues()) {
-            Scorecard existingScorecard = latestScorecardsByQuestion.get(newValue.getQuestionId());
-            if (existingScorecard != null) {
-
-                existingScorecard.setResponse(this.findResponseById(survey, newValue.getResponseId()));
-                existingScorecard.setValue(newValue.getValue());
-                updatedScorecards.add(existingScorecard);
-            }
-        }
-
-        this.scorecardService.updateScorecard(updatedScorecards);
-
-        return (List<ScorecardData>) this.scorecardReadPlatformService.retrieveScorecardBySurveyAndClient(surveyId, clientId);
-    }
-  
-    private Response findResponseById(Survey survey, Long responseId) {
-        return survey.getQuestions().stream().flatMap(q -> q.getResponses().stream()).filter(r -> r.getId().equals(responseId)).findFirst()
-                .orElseThrow(() -> new PlatformDataIntegrityException("error.msg.survey.response.not.found", "Response not found",
-                        "responseId", responseId));
-    }
 
     @GET
     @Path("clients/{clientId}/surveys")
@@ -262,5 +208,32 @@ public class ScorecardApiResource {
         
         // Return all submissions as is
         return new ArrayList<>(allSubmissions);
+    }
+
+    @PUT
+    @Path("{surveyId}/clients/{clientId}")
+    @Consumes({ MediaType.APPLICATION_JSON })
+    @Produces({ MediaType.APPLICATION_JSON })
+    @Transactional
+    @Operation(summary = "Update survey responses", description = "Update one or more responses for a client's survey submission")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "OK", content = @Content(schema = @Schema(implementation = ScorecardData.class)))
+    })
+    public ScorecardData updateSurveyResponses(
+        @PathParam("surveyId") @Parameter(description = "Survey ID") final Long surveyId,
+        @PathParam("clientId") @Parameter(description = "Client ID") final Long clientId,
+        @Parameter(description = "Updated responses") final ScorecardData scorecardData) {
+        
+        // Authenticate user
+        final AppUser appUser = this.securityContext.authenticatedUser();
+        
+        // Validate survey exists
+        final Survey survey = this.spmService.findById(surveyId);
+        
+        // Validate client exists
+        final Client client = this.clientRepositoryWrapper.findOneWithNotFoundDetection(clientId);
+        
+        // Update the responses
+        return this.scorecardService.updateScorecardResponses(survey, client, appUser, scorecardData);
     }
 }

@@ -79,21 +79,6 @@ public class SelfScorecardApiResource {
         }
     }
 
-    @PUT
-    @Path("{surveyId}/clients/{clientId}")
-    @Consumes({ MediaType.APPLICATION_JSON })
-    @Produces({ MediaType.APPLICATION_JSON })
-    @Transactional
-    @Operation(summary = "Update a Scorecard entry", description = "Update an existing survey response for a client.\n" + "\n"
-            + "Mandatory Fields\n" + "clientId, createdOn, questionId, responseId, staffId")
-    @ApiResponses({ @ApiResponse(responseCode = "200", description = "OK") })
-    public void updateScorecard(@PathParam("surveyId") @Parameter(description = "Enter surveyId") final Long surveyId,
-            @PathParam("clientId") @Parameter(description = "Enter clientId") final Long clientId,
-            @Parameter(description = "scorecardData") final ScorecardData scorecardData) {
-        validateAppuserClientsMapping(clientId);
-        this.scorecardApiResource.updateScorecard(surveyId, clientId, scorecardData);
-    }
-
     @GET
     @Path("{surveyId}/clients/{clientId}")
     @Consumes({ MediaType.APPLICATION_JSON })
@@ -117,6 +102,27 @@ public class SelfScorecardApiResource {
     public List<ScorecardData> viewClientResponses(@PathParam("clientId") @Parameter(description = "Client ID") final Long clientId) {
         validateAppuserClientsMapping(clientId);
         return this.scorecardApiResource.viewClientResponses(clientId);
+    }
+
+    @PUT
+    @Path("{surveyId}/clients/{clientId}")
+    @Consumes({ MediaType.APPLICATION_JSON })
+    @Produces({ MediaType.APPLICATION_JSON })
+    @Transactional
+    @Operation(summary = "Update survey responses", description = "Update one or more responses for a client's survey submission")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "OK", content = @Content(schema = @Schema(implementation = ScorecardData.class)))
+    })
+    public ScorecardData updateSurveyResponses(
+        @PathParam("surveyId") @Parameter(description = "Survey ID") final Long surveyId,
+        @PathParam("clientId") @Parameter(description = "Client ID") final Long clientId,
+        @Parameter(description = "Updated responses") final ScorecardData scorecardData) {
+        
+        // Validate client-user mapping
+        validateAppuserClientsMapping(clientId);
+        
+        // Delegate to the main ScorecardApiResource
+        return this.scorecardApiResource.updateSurveyResponses(surveyId, clientId, scorecardData);
     }
 
     private void validateAppuserClientsMapping(final Long clientId) {
