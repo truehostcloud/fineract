@@ -64,6 +64,7 @@ import org.apache.fineract.client.models.GetLoansLoanIdTransactions;
 import org.apache.fineract.client.models.GetLoansLoanIdTransactionsResponse;
 import org.apache.fineract.client.models.GetLoansLoanIdTransactionsTemplateResponse;
 import org.apache.fineract.client.models.GetLoansLoanIdTransactionsTransactionIdResponse;
+import org.apache.fineract.client.models.GetLoansResponse;
 import org.apache.fineract.client.models.PaymentTypeData;
 import org.apache.fineract.client.models.PostLoanProductsRequest;
 import org.apache.fineract.client.models.PostLoanProductsResponse;
@@ -1610,6 +1611,12 @@ public class LoanTransactionHelper {
     // TODO: Rewrite to use fineract-client instead!
     // Example: org.apache.fineract.integrationtests.common.loans.LoanTransactionHelper.disburseLoan(java.lang.Long,
     // org.apache.fineract.client.models.PostLoansLoanIdRequest)
+
+    public GetLoansResponse retrieveAllLoans(final String accountNumber, final String associations, final Long clientId) {
+        return Calls.ok(FineractClientHelper.getFineractClient().loans.retrieveAll27(null, 0, 10, null, null, accountNumber, associations,
+                clientId, null));
+    }
+
     @Deprecated(forRemoval = true)
     public GetLoansLoanIdTransactionsTransactionIdResponse getLoanTransaction(final Integer loanId, final Integer txnId) {
         final String GET_LOAN_CHARGES_URL = "/fineract-provider/api/v1/loans/" + loanId + "/transactions/" + txnId + "?"

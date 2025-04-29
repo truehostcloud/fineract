@@ -31,7 +31,7 @@ import org.apache.fineract.portfolio.delinquency.data.DelinquencyBucketData;
 /**
  * Created by Chirag Gupta on 12/27/17.
  */
-final class LoanProductsApiResourceSwagger {
+public final class LoanProductsApiResourceSwagger {
 
     private LoanProductsApiResourceSwagger() {}
 
@@ -195,6 +195,14 @@ final class LoanProductsApiResourceSwagger {
         public Boolean enableAccrualActivityPosting;
         @Schema(example = "false")
         public Boolean interestRecognitionOnDisbursementDate;
+        @Schema(example = "false")
+        public Boolean enableIncomeCapitalization;
+        @Schema(example = "FLAT", allowableValues = "FLAT")
+        public String capitalizedIncomeCalculationType;
+        @Schema(example = "EQUAL_AMORTIZATION", allowableValues = "EQUAL_AMORTIZATION")
+        public String capitalizedIncomeStrategy;
+        @Schema(example = "FEE", allowableValues = { "FEE", "INTEREST" })
+        public String capitalizedIncomeType;
 
         // Interest Recalculation
         @Schema(example = "false")
@@ -269,6 +277,10 @@ final class LoanProductsApiResourceSwagger {
         public Long incomeFromGoodwillCreditFeesAccountId;
         @Schema(example = "11")
         public Long incomeFromGoodwillCreditPenaltyAccountId;
+        @Schema(example = "25")
+        public Long deferredIncomeLiabilityAccountId;
+        @Schema(example = "37")
+        public Long incomeFromCapitalizationAccountId;
         public List<GetLoanProductsProductIdResponse.GetLoanPaymentChannelToFundSourceMappings> paymentChannelToFundSourceMappings;
         public List<LoanProductChargeToGLAccountMapper> feeToIncomeAccountMappings;
         public List<PostChargeOffReasonToExpenseAccountMappings> chargeOffReasonToExpenseAccountMappings;
@@ -649,6 +661,16 @@ final class LoanProductsApiResourceSwagger {
         public GetLoanProductsResponse.GetLoanProductsRepaymentStartDateType repaymentStartDateType;
         public List<StringEnumOptionData> supportedInterestRefundTypes;
         public StringEnumOptionData chargeOffBehaviour;
+        @Schema(example = "false")
+        public Boolean interestRecognitionOnDisbursementDate;
+        @Schema(example = "false")
+        public Boolean enableIncomeCapitalization;
+        @Schema(example = "FLAT")
+        public StringEnumOptionData capitalizedIncomeCalculationType;
+        @Schema(example = "EQUAL_AMORTIZATION")
+        public StringEnumOptionData capitalizedIncomeStrategy;
+        @Schema(example = "FEE")
+        public StringEnumOptionData capitalizedIncomeType;
     }
 
     @Schema(description = "GetLoanProductsTemplateResponse")
@@ -1038,24 +1060,6 @@ final class LoanProductsApiResourceSwagger {
             public String description;
         }
 
-        static final class GetLoanProductsChargeOffReasonOptions {
-
-            private GetLoanProductsChargeOffReasonOptions() {}
-
-            @Schema(example = "2")
-            public Long id;
-            @Schema(example = "debit_card")
-            public String name;
-            @Schema(example = "2")
-            public Integer position;
-            @Schema(example = "Charge-Off reason description")
-            public String description;
-            @Schema(example = "true")
-            public Boolean active;
-            @Schema(example = "false")
-            public Boolean mandatory;
-        }
-
         @Schema(example = "false")
         public Boolean includeInBorrowerCycle;
         @Schema(example = "false")
@@ -1113,6 +1117,17 @@ final class LoanProductsApiResourceSwagger {
         public List<GetLoanProductsChargeOffReasonOptions> chargeOffReasonOptions;
         public StringEnumOptionData chargeOffBehaviour;
         public List<StringEnumOptionData> chargeOffBehaviourOptions;
+        @Schema(example = "false")
+        public Boolean enableIncomeCapitalization;
+        @Schema(example = "FLAT")
+        public StringEnumOptionData capitalizedIncomeCalculationType;
+        @Schema(example = "EQUAL_AMORTIZATION")
+        public StringEnumOptionData capitalizedIncomeStrategy;
+        @Schema(example = "FEE")
+        public StringEnumOptionData capitalizedIncomeType;
+        public List<StringEnumOptionData> capitalizedIncomeCalculationTypeOptions;
+        public List<StringEnumOptionData> capitalizedIncomeStrategyOptions;
+        public List<StringEnumOptionData> capitalizedIncomeTypeOptions;
     }
 
     @Schema(description = "GetLoanProductsProductIdResponse")
@@ -1223,6 +1238,8 @@ final class LoanProductsApiResourceSwagger {
             public GetGlAccountMapping chargeOffExpenseAccount;
             public GetGlAccountMapping chargeOffFraudExpenseAccount;
             public GetGlAccountMapping overpaymentLiabilityAccount;
+            public GetGlAccountMapping deferredIncomeLiabilityAccount;
+            public GetGlAccountMapping incomeFromCapitalizationAccount;
         }
 
         static final class GetLoanPaymentChannelToFundSourceMappings {
@@ -1428,10 +1445,21 @@ final class LoanProductsApiResourceSwagger {
         @Schema(example = "false")
         public Boolean enableAccrualActivityPosting;
         public List<StringEnumOptionData> supportedInterestRefundTypes;
-        public List<GetLoanProductsTemplateResponse.GetLoanProductsChargeOffReasonOptions> chargeOffReasonOptions;
+        public List<GetLoanProductsChargeOffReasonOptions> chargeOffReasonOptions;
         public StringEnumOptionData chargeOffBehaviour;
         @Schema(example = "false")
         public Boolean interestRecognitionOnDisbursementDate;
+        @Schema(example = "false")
+        public Boolean enableIncomeCapitalization;
+        @Schema(example = "FLAT")
+        public StringEnumOptionData capitalizedIncomeCalculationType;
+        @Schema(example = "EQUAL_AMORTIZATION")
+        public StringEnumOptionData capitalizedIncomeStrategy;
+        @Schema(example = "FEE")
+        public StringEnumOptionData capitalizedIncomeType;
+        public List<StringEnumOptionData> capitalizedIncomeCalculationTypeOptions;
+        public List<StringEnumOptionData> capitalizedIncomeStrategyOptions;
+        public List<StringEnumOptionData> capitalizedIncomeTypeOptions;
     }
 
     @Schema(description = "PutLoanProductsProductIdRequest")
@@ -1649,6 +1677,10 @@ final class LoanProductsApiResourceSwagger {
 
         @Schema(example = "11")
         public Long incomeFromChargeOffPenaltyAccountId;
+        @Schema(example = "25")
+        public Long deferredIncomeLiabilityAccountId;
+        @Schema(example = "37")
+        public Long incomeFromCapitalizationAccountId;
         public List<GetLoanProductsProductIdResponse.GetLoanPaymentChannelToFundSourceMappings> paymentChannelToFundSourceMappings;
         public List<LoanProductChargeToGLAccountMapper> feeToIncomeAccountMappings;
         public List<PostLoanProductsRequest.PostChargeOffReasonToExpenseAccountMappings> chargeOffReasonToExpenseAccountMappings;
@@ -1685,6 +1717,14 @@ final class LoanProductsApiResourceSwagger {
         public List<String> supportedInterestRefundTypes;
         @Schema(example = "REGULAR")
         public String chargeOffBehaviour;
+        @Schema(example = "false")
+        public Boolean enableIncomeCapitalization;
+        @Schema(example = "FLAT", allowableValues = "FLAT")
+        public String capitalizedIncomeCalculationType;
+        @Schema(example = "EQUAL_AMORTIZATION", allowableValues = "EQUAL_AMORTIZATION")
+        public String capitalizedIncomeStrategy;
+        @Schema(example = "FEE", allowableValues = { "FEE", "INTEREST" })
+        public String capitalizedIncomeType;
     }
 
     public static final class AdvancedPaymentData {
@@ -1742,5 +1782,24 @@ final class LoanProductsApiResourceSwagger {
         @Schema(example = "1")
         public Long resourceId;
         public PutLoanChanges changes;
+    }
+
+    @Schema(description = "GetLoanProductsChargeOffReasonOptions")
+    public static final class GetLoanProductsChargeOffReasonOptions {
+
+        private GetLoanProductsChargeOffReasonOptions() {}
+
+        @Schema(example = "2")
+        public Long id;
+        @Schema(example = "debit_card")
+        public String name;
+        @Schema(example = "2")
+        public Integer position;
+        @Schema(example = "Charge-Off reason description")
+        public String description;
+        @Schema(example = "true")
+        public Boolean active;
+        @Schema(example = "false")
+        public Boolean mandatory;
     }
 }

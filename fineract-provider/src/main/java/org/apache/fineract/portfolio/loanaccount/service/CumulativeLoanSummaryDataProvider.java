@@ -33,6 +33,7 @@ import org.apache.fineract.portfolio.loanaccount.domain.Loan;
 import org.apache.fineract.portfolio.loanaccount.loanschedule.data.LoanScheduleData;
 import org.apache.fineract.portfolio.loanaccount.loanschedule.data.LoanSchedulePeriodData;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 @Component
 public class CumulativeLoanSummaryDataProvider extends CommonLoanSummaryDataProvider {
@@ -65,8 +66,9 @@ public class CumulativeLoanSummaryDataProvider extends CommonLoanSummaryDataProv
     }
 
     @Override
+    @Transactional(readOnly = true)
     public LoanSummaryData withTransactionAmountsSummary(Long loanId, LoanSummaryData defaultSummaryData,
-            LoanScheduleData repaymentSchedule, Collection<LoanTransactionBalance> loanTransactionBalances) {
+            LoanScheduleData repaymentSchedule, Collection<? extends LoanTransactionBalance> loanTransactionBalances) {
         Loan loan = null;
         return super.withTransactionAmountsSummary(loan, defaultSummaryData, repaymentSchedule, loanTransactionBalances);
     }

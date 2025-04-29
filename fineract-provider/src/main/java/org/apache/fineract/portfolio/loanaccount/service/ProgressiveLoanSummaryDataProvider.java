@@ -43,6 +43,7 @@ import org.apache.fineract.portfolio.loanproduct.calc.EMICalculator;
 import org.apache.fineract.portfolio.loanproduct.calc.data.OutstandingDetails;
 import org.apache.fineract.portfolio.loanproduct.calc.data.ProgressiveLoanInterestScheduleModel;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 @Component
 @AllArgsConstructor
@@ -59,15 +60,16 @@ public class ProgressiveLoanSummaryDataProvider extends CommonLoanSummaryDataPro
     }
 
     @Override
+    @Transactional(readOnly = true)
     public LoanSummaryData withTransactionAmountsSummary(Long loanId, LoanSummaryData defaultSummaryData,
-            LoanScheduleData repaymentSchedule, Collection<LoanTransactionBalance> loanTransactionBalances) {
+            LoanScheduleData repaymentSchedule, Collection<? extends LoanTransactionBalance> loanTransactionBalances) {
         final Loan loan = loanRepository.findOneWithNotFoundDetection(loanId, true);
         return super.withTransactionAmountsSummary(loan, defaultSummaryData, repaymentSchedule, loanTransactionBalances);
     }
 
     @Override
     public LoanSummaryData withTransactionAmountsSummary(Loan loan, LoanSummaryData defaultSummaryData, LoanScheduleData repaymentSchedule,
-            Collection<LoanTransactionBalance> loanTransactionBalances) {
+            Collection<? extends LoanTransactionBalance> loanTransactionBalances) {
         return super.withTransactionAmountsSummary(loan, defaultSummaryData, repaymentSchedule, loanTransactionBalances);
     }
 
@@ -98,7 +100,8 @@ public class ProgressiveLoanSummaryDataProvider extends CommonLoanSummaryDataPro
                                 loan.getCurrency(), loan.getRepaymentScheduleInstallments(), loan.getActiveCharges());
                 ProgressiveLoanInterestScheduleModel model = changedTransactionDetailProgressiveLoanInterestScheduleModelPair.getRight();
                 final List<Long> replayedTransactions = changedTransactionDetailProgressiveLoanInterestScheduleModelPair.getLeft()
-                        .getTransactionChanges().stream().filter(change -> change.getOldTransaction() != null)
+                        .getTransactionChanges().stream()
+                        .filter(change -> change.getOldTransaction() != null && change.getNewTransaction() != null)
                         .map(change -> change.getNewTransaction().getId()).filter(Objects::nonNull).toList();
 
                 if (!replayedTransactions.isEmpty()) {

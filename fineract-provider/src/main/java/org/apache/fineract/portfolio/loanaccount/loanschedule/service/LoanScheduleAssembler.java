@@ -118,6 +118,7 @@ import org.apache.fineract.portfolio.loanaccount.service.LoanChargeAssembler;
 import org.apache.fineract.portfolio.loanaccount.service.LoanChargeService;
 import org.apache.fineract.portfolio.loanaccount.service.LoanDisbursementDetailsAssembler;
 import org.apache.fineract.portfolio.loanaccount.service.LoanDisbursementService;
+import org.apache.fineract.portfolio.loanaccount.service.LoanProductRelatedDetailUpdateUtil;
 import org.apache.fineract.portfolio.loanaccount.service.LoanScheduleService;
 import org.apache.fineract.portfolio.loanaccount.service.LoanUtilService;
 import org.apache.fineract.portfolio.loanproduct.LoanProductConstants;
@@ -159,11 +160,12 @@ public class LoanScheduleAssembler {
     private final LoanUtilService loanUtilService;
     private final LoanDisbursementDetailsAssembler loanDisbursementDetailsAssembler;
     private final LoanRepositoryWrapper loanRepositoryWrapper;
-    private final LoanLifecycleStateMachine defaultLoanLifecycleStateMachine;
+    private final LoanLifecycleStateMachine loanLifecycleStateMachine;
     private final LoanAccrualsProcessingService loanAccrualsProcessingService;
     private final LoanDisbursementService loanDisbursementService;
     private final LoanChargeService loanChargeService;
     private final LoanScheduleService loanScheduleService;
+    private final LoanProductRelatedDetailUpdateUtil relatedDetailUpdateUtil;
 
     public LoanApplicationTerms assembleLoanTerms(final JsonElement element) {
         final Long loanProductId = this.fromApiJsonHelper.extractLongNamed("productId", element);
@@ -421,7 +423,7 @@ public class LoanScheduleAssembler {
                             loanProductInterestRecalculationDetails.getCompoundingInterval(), recalculationCompoundingFrequencyNthDay,
                             compoundingRepeatsOnDay);
                 }
-                allowCompoundingOnEod = loanProductInterestRecalculationDetails.allowCompoundingOnEod();
+                allowCompoundingOnEod = loanProductInterestRecalculationDetails.getAllowCompoundingOnEod();
             }
         }
 
@@ -542,7 +544,11 @@ public class LoanScheduleAssembler {
                 loanProduct.getLoanProductRelatedDetail().isEnableAccrualActivityPosting(),
                 loanProduct.getLoanProductRelatedDetail().getSupportedInterestRefundTypes(),
                 loanProduct.getLoanProductRelatedDetail().getChargeOffBehaviour(), interestRecognitionOnDisbursementDate,
-                loanProduct.getLoanProductRelatedDetail().getDaysInYearCustomStrategy());
+                loanProduct.getLoanProductRelatedDetail().getDaysInYearCustomStrategy(),
+                loanProduct.getLoanProductRelatedDetail().isEnableIncomeCapitalization(),
+                loanProduct.getLoanProductRelatedDetail().getCapitalizedIncomeCalculationType(),
+                loanProduct.getLoanProductRelatedDetail().getCapitalizedIncomeStrategy(),
+                loanProduct.getLoanProductRelatedDetail().getCapitalizedIncomeType());
     }
 
     private CalendarInstance createCalendarForSameAsRepayment(final Integer repaymentEvery,
@@ -910,7 +916,7 @@ public class LoanScheduleAssembler {
                     overlappings);
         }
         LoanProductVariableInstallmentConfig installmentConfig = loan.loanProduct().loanProductVariableInstallmentConfig();
-        final CalendarInstance loanCalendarInstance = calendarInstanceRepository.findCalendarInstaneByEntityId(loan.getId(),
+        final CalendarInstance loanCalendarInstance = calendarInstanceRepository.findCalendarInstanceByEntityId(loan.getId(),
                 CalendarEntityType.LOANS.getValue());
         Calendar loanCalendar = null;
         if (loanCalendarInstance != null) {
@@ -1303,7 +1309,7 @@ public class LoanScheduleAssembler {
             changes.put(interestRatePerPeriodParamName, newValue);
             changes.put("locale", localeAsInput);
             loanProductRelatedDetail.setNominalInterestRatePerPeriod(newValue);
-            loanProductRelatedDetail.updateInterestRateDerivedFields(aprCalculator);
+            relatedDetailUpdateUtil.updateInterestRateDerivedFields(loanProductRelatedDetail, aprCalculator);
         }
 
         final String interestRateFrequencyTypeParamName = "interestRateFrequencyType";
@@ -1315,7 +1321,7 @@ public class LoanScheduleAssembler {
             changes.put(interestRateFrequencyTypeParamName, newValue);
             changes.put("locale", localeAsInput);
             loanProductRelatedDetail.setInterestPeriodFrequencyType(PeriodFrequencyType.fromInt(newValue));
-            loanProductRelatedDetail.updateInterestRateDerivedFields(aprCalculator);
+            relatedDetailUpdateUtil.updateInterestRateDerivedFields(loanProductRelatedDetail, aprCalculator);
         }
 
         final String interestTypeParamName = "interestType";
@@ -1474,7 +1480,7 @@ public class LoanScheduleAssembler {
         final Loan loan = this.loanRepositoryWrapper.findOneWithNotFoundDetection(loanId, true);
 
         final Map<String, Object> actualChanges = new HashMap<>();
-        defaultLoanLifecycleStateMachine.transition(LoanEvent.LOAN_APPROVED, loan);
+        loanLifecycleStateMachine.transition(LoanEvent.LOAN_APPROVED, loan);
         actualChanges.put(PARAM_STATUS, LoanEnumerations.status(loan.getStatus()));
 
         LocalDate approvedOn = command.localDateValueOfParameterNamed(APPROVED_ON_DATE);

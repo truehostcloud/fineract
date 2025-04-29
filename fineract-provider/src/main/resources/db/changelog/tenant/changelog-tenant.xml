@@ -191,4 +191,8 @@
     <include file="parts/0170_days_in_year_custom_strategy.xml" relativeToChangelogFile="true"/>
     <include file="parts/0171_add_document_business_events.xml" relativeToChangelogFile="true"/>
     <include file="parts/0172_add_password_reset_token_fields.xml" relativeToChangelogFile="true"/>
+    <include file="parts/0171_loan_capitalized_income.xml" relativeToChangelogFile="true"/>
+    <include file="parts/0172_create_loan_capitalized_income_balance.xml" relativeToChangelogFile="true"/>
+    <include file="parts/0173_user_change_pwd.xml" relativeToChangelogFile="true" />
+    <include file="parts/0174_loan_product_add_capitalized_income_type.xml" relativeToChangelogFile="true" />
 </databaseChangeLog>

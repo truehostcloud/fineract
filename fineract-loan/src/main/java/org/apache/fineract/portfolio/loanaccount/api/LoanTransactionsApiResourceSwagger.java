@@ -20,7 +20,9 @@ package org.apache.fineract.portfolio.loanaccount.api;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.LocalDate;
+import java.util.List;
 import java.util.Set;
+import org.apache.fineract.portfolio.loanproduct.api.LoanProductsApiResourceSwagger.GetLoanProductsChargeOffReasonOptions;
 import org.springframework.data.domain.Page;
 
 /**
@@ -73,7 +75,19 @@ final class LoanTransactionsApiResourceSwagger {
             public String displaySymbolValue;
         }
 
-        public GetLoansTransactionType transactionType;
+        static final class GetPaymentTypeOptions {
+
+            private GetPaymentTypeOptions() {}
+
+            @Schema(example = "10")
+            public Long id;
+            @Schema(example = "check")
+            public String name;
+            @Schema(example = "1")
+            public Integer position;
+        }
+
+        public GetLoansTransactionType type;
         @Schema(example = "[2009, 8, 1]")
         public LocalDate date;
         public GetLoansTotal total;
@@ -90,6 +104,10 @@ final class LoanTransactionsApiResourceSwagger {
         public Double penaltyChargesPortion;
 
         public GetLoanCurrency currency;
+
+        public List<GetLoanProductsChargeOffReasonOptions> chargeOffReasonOptions;
+
+        public List<GetPaymentTypeOptions> paymentTypeOptions;
     }
 
     public static final class GetLoanCurrency {
