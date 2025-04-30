@@ -26,8 +26,14 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.constraints.NotNull;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.MediaType;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.apache.fineract.infrastructure.core.exception.PlatformDataIntegrityException;
 import org.apache.fineract.infrastructure.security.service.PlatformSecurityContext;
@@ -42,17 +48,10 @@ import org.apache.fineract.spm.service.ScorecardService;
 import org.apache.fineract.spm.service.SpmService;
 import org.apache.fineract.spm.util.ScorecardMapper;
 import org.apache.fineract.useradministration.domain.AppUser;
-import jakarta.validation.constraints.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.List;
-import java.util.Map;
-import java.util.stream.Collectors;
 
 @Path("/v1/surveys/scorecards")
 @Component
@@ -69,12 +68,12 @@ public class ScorecardApiResource {
 
     @GET
     @Path("{surveyId}")
-    @Consumes({MediaType.APPLICATION_JSON})
-    @Produces({MediaType.APPLICATION_JSON})
+    @Consumes({ MediaType.APPLICATION_JSON })
+    @Produces({ MediaType.APPLICATION_JSON })
     @Transactional
     @Operation(summary = "List all Scorecard entries", description = "List all Scorecard entries for a survey.")
     @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "OK", content = @Content(array = @ArraySchema(schema = @Schema(implementation = Scorecard.class))))})
+            @ApiResponse(responseCode = "200", description = "OK", content = @Content(array = @ArraySchema(schema = @Schema(implementation = Scorecard.class)))) })
     public List<ScorecardData> findBySurvey(@PathParam("surveyId") @Parameter(description = "Enter surveyId") final Long surveyId) {
         this.securityContext.authenticatedUser();
         this.spmService.findById(surveyId);
@@ -83,14 +82,14 @@ public class ScorecardApiResource {
 
     @POST
     @Path("{surveyId}")
-    @Consumes({MediaType.APPLICATION_JSON})
-    @Produces({MediaType.APPLICATION_JSON})
+    @Consumes({ MediaType.APPLICATION_JSON })
+    @Produces({ MediaType.APPLICATION_JSON })
     @Transactional
     @Operation(summary = "Create a Scorecard entry", description = "Add a new entry to a survey.\n" + "\n" + "Mandatory Fields\n"
             + "clientId, createdOn, questionId, responseId, staffId")
-    @ApiResponses({@ApiResponse(responseCode = "200", description = "OK")})
+    @ApiResponses({ @ApiResponse(responseCode = "200", description = "OK") })
     public void createScorecard(@PathParam("surveyId") @Parameter(description = "Enter surveyId") final Long surveyId,
-                                @Parameter(description = "scorecardData") final ScorecardData scorecardData) {
+            @Parameter(description = "scorecardData") final ScorecardData scorecardData) {
         final AppUser appUser = this.securityContext.authenticatedUser();
         final Survey survey = this.spmService.findById(surveyId);
         final Client client = this.clientRepositoryWrapper.findOneWithNotFoundDetection(scorecardData.getClientId());
@@ -105,11 +104,11 @@ public class ScorecardApiResource {
 
     @GET
     @Path("{surveyId}/clients/{clientId}")
-    @Consumes({MediaType.APPLICATION_JSON})
-    @Produces({MediaType.APPLICATION_JSON})
+    @Consumes({ MediaType.APPLICATION_JSON })
+    @Produces({ MediaType.APPLICATION_JSON })
     @Transactional
     public List<ScorecardData> findBySurveyAndClient(@PathParam("surveyId") @Parameter(description = "Enter surveyId") final Long surveyId,
-                                                     @PathParam("clientId") @Parameter(description = "Enter clientId") final Long clientId) {
+            @PathParam("clientId") @Parameter(description = "Enter clientId") final Long clientId) {
         this.securityContext.authenticatedUser();
         this.spmService.findById(surveyId);
         this.clientRepositoryWrapper.findOneWithNotFoundDetection(clientId);
@@ -119,8 +118,8 @@ public class ScorecardApiResource {
 
     @GET
     @Path("clients/{clientId}")
-    @Consumes({MediaType.APPLICATION_JSON})
-    @Produces({MediaType.APPLICATION_JSON})
+    @Consumes({ MediaType.APPLICATION_JSON })
+    @Produces({ MediaType.APPLICATION_JSON })
     @Transactional
     public List<ScorecardData> findByClient(@PathParam("clientId") final Long clientId) {
         this.securityContext.authenticatedUser();
@@ -128,15 +127,14 @@ public class ScorecardApiResource {
         return (List<ScorecardData>) this.scorecardReadPlatformService.retrieveScorecardByClient(clientId);
     }
 
-
     @GET
     @Path("clients/{clientId}/surveys")
-    @Consumes({MediaType.APPLICATION_JSON})
-    @Produces({MediaType.APPLICATION_JSON})
+    @Consumes({ MediaType.APPLICATION_JSON })
+    @Produces({ MediaType.APPLICATION_JSON })
     @Transactional
     @Operation(summary = "View client survey responses", description = "Retrieves the latest survey submissions for a client")
     @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "OK", content = @Content(array = @ArraySchema(schema = @Schema(implementation = ScorecardData.class))))})
+            @ApiResponse(responseCode = "200", description = "OK", content = @Content(array = @ArraySchema(schema = @Schema(implementation = ScorecardData.class)))) })
     public List<ScorecardData> viewClientResponses(@PathParam("clientId") @Parameter(description = "Client ID") final Long clientId) {
         this.clientRepositoryWrapper.findOneWithNotFoundDetection(clientId);
 
@@ -151,17 +149,12 @@ public class ScorecardApiResource {
             List<ScorecardData> surveySubmissions = entry.getValue();
 
             // Flatten all scorecard values from all submissions
-            List<ScorecardValue> allValues = surveySubmissions.stream()
-                    .flatMap(submission -> submission.getScorecardValues().stream())
+            List<ScorecardValue> allValues = surveySubmissions.stream().flatMap(submission -> submission.getScorecardValues().stream())
                     .toList();
 
             // Group values by questionId and get the latest value for each question
-            Map<Long, ScorecardValue> latestValuesByQuestion = allValues.stream()
-                    .collect(Collectors.toMap(
-                            ScorecardValue::getQuestionId,
-                            value -> value,
-                            (v1, v2) -> v1.getCreatedOn().isAfter(v2.getCreatedOn()) ? v1 : v2
-                    ));
+            Map<Long, ScorecardValue> latestValuesByQuestion = allValues.stream().collect(Collectors.toMap(ScorecardValue::getQuestionId,
+                    value -> value, (v1, v2) -> v1.getCreatedOn().isAfter(v2.getCreatedOn()) ? v1 : v2));
 
             // Create a new ScorecardData with the latest values for each question
             if (!latestValuesByQuestion.isEmpty()) {
@@ -187,18 +180,15 @@ public class ScorecardApiResource {
         return completeSubmission;
     }
 
-
     @PUT
     @Path("{surveyId}/clients/{clientId}")
-    @Consumes({MediaType.APPLICATION_JSON})
-    @Produces({MediaType.APPLICATION_JSON})
+    @Consumes({ MediaType.APPLICATION_JSON })
+    @Produces({ MediaType.APPLICATION_JSON })
     @Transactional
     @Operation(summary = "Update survey responses", description = "Update one or more responses for a client's survey submission")
     @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "OK", content = @Content(schema = @Schema(implementation = ScorecardData.class)))
-    })
-    public ScorecardData updateSurveyResponses(
-            @PathParam("surveyId") @Parameter(description = "Survey ID") final Long surveyId,
+            @ApiResponse(responseCode = "200", description = "OK", content = @Content(schema = @Schema(implementation = ScorecardData.class))) })
+    public ScorecardData updateSurveyResponses(@PathParam("surveyId") @Parameter(description = "Survey ID") final Long surveyId,
             @PathParam("clientId") @Parameter(description = "Client ID") final Long clientId,
             @Parameter(description = "Updated responses") final ScorecardData scorecardData) {
 

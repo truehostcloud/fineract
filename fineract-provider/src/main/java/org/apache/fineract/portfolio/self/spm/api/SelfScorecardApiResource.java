@@ -111,16 +111,14 @@ public class SelfScorecardApiResource {
     @Transactional
     @Operation(summary = "Update survey responses", description = "Update one or more responses for a client's survey submission")
     @ApiResponses({
-        @ApiResponse(responseCode = "200", description = "OK", content = @Content(schema = @Schema(implementation = ScorecardData.class)))
-    })
-    public ScorecardData updateSurveyResponses(
-        @PathParam("surveyId") @Parameter(description = "Survey ID") final Long surveyId,
-        @PathParam("clientId") @Parameter(description = "Client ID") final Long clientId,
-        @Parameter(description = "Updated responses") final ScorecardData scorecardData) {
-        
+            @ApiResponse(responseCode = "200", description = "OK", content = @Content(schema = @Schema(implementation = ScorecardData.class))) })
+    public ScorecardData updateSurveyResponses(@PathParam("surveyId") @Parameter(description = "Survey ID") final Long surveyId,
+            @PathParam("clientId") @Parameter(description = "Client ID") final Long clientId,
+            @Parameter(description = "Updated responses") final ScorecardData scorecardData) {
+
         // Validate client-user mapping
         validateAppuserClientsMapping(clientId);
-        
+
         // Delegate to the main ScorecardApiResource
         return this.scorecardApiResource.updateSurveyResponses(surveyId, clientId, scorecardData);
     }

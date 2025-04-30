@@ -47,16 +47,13 @@ public class SelfServicePasswordResetWritePlatformServiceImpl implements SelfSer
         }
 
         List<AppUser> users = this.appUserRepository.findAllByEmail(email);
-        
+
         if (users.isEmpty()) {
             return new CommandProcessingResultBuilder().withCommandId(command.commandId()).build();
         }
 
-        List<AppUser> activeSelfServiceUsers = users.stream()
-                .filter(AppUser::isSelfServiceUser)
-                .filter(u -> !u.isDeleted())
-                .filter(AppUser::isEnabled)
-                .toList();
+        List<AppUser> activeSelfServiceUsers = users.stream().filter(AppUser::isSelfServiceUser).filter(u -> !u.isDeleted())
+                .filter(AppUser::isEnabled).toList();
 
         if (!activeSelfServiceUsers.isEmpty()) {
             for (AppUser user : activeSelfServiceUsers) {
