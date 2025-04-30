@@ -19,6 +19,7 @@
 package org.apache.fineract.useradministration.domain;
 
 import java.util.Collection;
+import java.util.List;
 import org.apache.fineract.infrastructure.security.domain.PlatformUserRepository;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
@@ -34,6 +35,9 @@ public interface AppUserRepository extends JpaRepository<AppUser, Long>, JpaSpec
 
     @Query("Select appUser from AppUser appUser where appUser.email = :email")
     AppUser findByEmail(@Param("email") String email);
+
+    @Query("Select appUser from AppUser appUser where appUser.email = :email")
+    List<AppUser> findAllByEmail(@Param("email") String email);
 
     @Query("Select appUser from AppUser appUser where appUser.passwordResetToken = :token")
     AppUser findByPasswordResetToken(@Param("token") String token);

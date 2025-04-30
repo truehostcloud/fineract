@@ -18,6 +18,10 @@
  */
 package org.apache.fineract.spm.service;
 
+import java.time.LocalDateTime;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.apache.fineract.infrastructure.core.exception.PlatformDataIntegrityException;
 import org.apache.fineract.infrastructure.security.service.PlatformSecurityContext;
@@ -27,11 +31,6 @@ import org.apache.fineract.spm.data.ScorecardValue;
 import org.apache.fineract.spm.domain.*;
 import org.apache.fineract.useradministration.domain.AppUser;
 import org.springframework.stereotype.Service;
-
-import java.time.LocalDateTime;
-import java.util.Comparator;
-import java.util.List;
-import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
@@ -98,10 +97,8 @@ public class ScorecardService {
             }
         }
 
-        return scorecardReadPlatformService.retrieveScorecardBySurveyAndClient(survey.getId(), client.getId())
-                .stream()
-                .findFirst()
-                .orElseThrow(() -> new PlatformDataIntegrityException("error.msg.survey.update.failed",
-                        "Failed to update survey responses", "surveyId", survey.getId()));
+        return scorecardReadPlatformService.retrieveScorecardBySurveyAndClient(survey.getId(), client.getId()).stream().findFirst()
+                .orElseThrow(() -> new PlatformDataIntegrityException("error.msg.survey.update.failed", "Failed to update survey responses",
+                        "surveyId", survey.getId()));
     }
 }
