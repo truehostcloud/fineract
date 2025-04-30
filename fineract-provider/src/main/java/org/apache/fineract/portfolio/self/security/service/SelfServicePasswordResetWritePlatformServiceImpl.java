@@ -46,15 +46,27 @@ public class SelfServicePasswordResetWritePlatformServiceImpl implements SelfSer
             throw new PlatformApiDataValidationException(dataValidationErrors);
         }
 
-        AppUser user = this.appUserRepository.findByEmail(email);
+        List<AppUser> users = this.appUserRepository.findAllByEmail(email);
+        
+        if (users.isEmpty()) {
+            return new CommandProcessingResultBuilder().withCommandId(command.commandId()).build();
+        }
 
-        if (user != null && user.isSelfServiceUser()) {
-            String resetToken = generateResetToken();
-            user.setPasswordResetToken(resetToken);
-            user.setPasswordResetTokenExpiry(LocalDateTime.now().plusHours(24));
-            this.appUserRepository.save(user);
+        List<AppUser> activeSelfServiceUsers = users.stream()
+                .filter(AppUser::isSelfServiceUser)
+                .filter(u -> !u.isDeleted())
+                .filter(AppUser::isEnabled)
+                .toList();
 
-            sendPasswordResetEmail(user, resetToken);
+        if (!activeSelfServiceUsers.isEmpty()) {
+            for (AppUser user : activeSelfServiceUsers) {
+                String resetToken = generateResetToken();
+                user.setPasswordResetToken(resetToken);
+                user.setPasswordResetTokenExpiry(LocalDateTime.now().plusHours(24));
+                this.appUserRepository.save(user);
+
+                sendPasswordResetEmail(user, resetToken);
+            }
         }
         return new CommandProcessingResultBuilder().withCommandId(command.commandId()).build();
     }
