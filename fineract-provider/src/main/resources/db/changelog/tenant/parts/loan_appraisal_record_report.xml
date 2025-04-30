@@ -1,0 +1,247 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+                   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                   xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-3.8.xsd">
+
+    <changeSet author="fineract" id="1">
+        <!-- preConditions should be the first element inside changeSet -->
+        <preConditions onFail="MARK_RAN">
+            <sqlCheck expectedResult="0">
+                SELECT COUNT(*)
+                FROM stretchy_report
+                WHERE report_name = 'Loan Appraisal Record'
+            </sqlCheck>
+        </preConditions>
+
+        <comment>Add Loan Appraisal Record report configuration</comment>
+
+        <!-- Add report first -->
+        <insert tableName="stretchy_report">
+            <column name="report_name" value="Loan Appraisal Record"/>
+            <column name="report_type" value="Pentaho"/>
+            <column name="report_category" value="Loan"/>
+            <column name="report_sql" value="(NULL)"/>
+            <column name="description" value="Loan Appraisal Record Report"/>
+            <column name="core_report" value="0"/>
+            <column name="use_report" value="1"/>
+            <column name="self_service_user_report" value="0"/>
+        </insert>
+
+        <!-- Store the report ID in a variable -->
+        <sql endDelimiter=";" stripComments="true">
+            SET
+            @report_id = (SELECT id FROM stretchy_report WHERE report_name = 'Loan Appraisal Record');
+        </sql>
+
+        <!-- Add parameters -->
+        <insert tableName="stretchy_parameter">
+            <column name="parameter_name" value="clientId"/>
+            <column name="parameter_variable" value="clientId"/>
+            <column name="parameter_label" value="Client"/>
+            <column name="parameter_displayType" value="select"/>
+            <column name="parameter_FormatType" value="number"/>
+            <column name="parameter_default" value=""/>
+            <column name="special"/>
+            <column name="selectOne" value="Y"/>
+            <column name="selectAll" value="N"/>
+            <column name="parameter_sql"
+                    value="SELECT m_client.id, m_client.display_name FROM m_client JOIN m_loan ON m_client.id = m_loan.client_id GROUP BY m_client.id, m_client.display_name"/>
+        </insert>
+
+        <sql endDelimiter=";" stripComments="true">
+            SET
+            @client_param_id = (SELECT id FROM stretchy_parameter WHERE parameter_name = 'clientId');
+        </sql>
+
+        <insert tableName="stretchy_report_parameter">
+            <column name="report_id" valueComputed="@report_id"/>
+            <column name="parameter_id" valueComputed="@client_param_id"/>
+            <column name="report_parameter_name" value="clientId"/>
+        </insert>
+
+        <insert tableName="stretchy_parameter">
+            <column name="parameter_name" value="loanOfficer"/>
+            <column name="parameter_variable" value="loanOfficer"/>
+            <column name="parameter_label" value="Loan Officer"/>
+            <column name="parameter_displayType" value="select"/>
+            <column name="parameter_FormatType" value="number"/>
+            <column name="parameter_default" value=""/>
+            <column name="special"/>
+            <column name="selectOne" value="Y"/>
+            <column name="selectAll" value="N"/>
+            <column name="parameter_sql" value="select id, display_name from m_staff where is_loan_officer = 1"/>
+        </insert>
+
+        <sql endDelimiter=";" stripComments="true">
+            SET
+            @loan_officer_param_id = (SELECT id FROM stretchy_parameter WHERE parameter_name = 'loanOfficer');
+        </sql>
+
+        <insert tableName="stretchy_report_parameter">
+            <column name="report_id" valueComputed="@report_id"/>
+            <column name="parameter_id" valueComputed="@loan_officer_param_id"/>
+            <column name="report_parameter_name" value="loanOfficer"/>
+        </insert>
+
+        <insert tableName="stretchy_parameter">
+            <column name="parameter_name" value="BasicSalary"/>
+            <column name="parameter_variable" value="BasicSalary"/>
+            <column name="parameter_label" value="Basic Salary"/>
+            <column name="parameter_displayType" value="text"/>
+            <column name="parameter_FormatType" value="number"/>
+            <column name="parameter_default" value=""/>
+            <column name="special"/>
+            <column name="selectOne" value="N"/>
+            <column name="selectAll" value="N"/>
+        </insert>
+
+        <sql endDelimiter=";" stripComments="true">
+            SET
+            @basic_salary_param_id = (SELECT id FROM stretchy_parameter WHERE parameter_name = 'BasicSalary');
+        </sql>
+
+        <insert tableName="stretchy_report_parameter">
+            <column name="report_id" valueComputed="@report_id"/>
+            <column name="parameter_id" valueComputed="@basic_salary_param_id"/>
+            <column name="report_parameter_name" value="BasicSalary"/>
+        </insert>
+
+        <insert tableName="stretchy_parameter">
+            <column name="parameter_name" value="Third"/>
+            <column name="parameter_variable" value="Third"/>
+            <column name="parameter_label" value="Third (enter any value - will be calculated automatically)"/>
+            <column name="parameter_displayType" value="text"/>
+            <column name="parameter_FormatType" value="number"/>
+            <column name="parameter_default" value="0.00"/>
+            <column name="special"/>
+            <column name="selectOne" value="N"/>
+            <column name="selectAll" value="N"/>
+        </insert>
+
+        <sql endDelimiter=";" stripComments="true">
+            SET
+            @third_param_id = (SELECT id FROM stretchy_parameter WHERE parameter_name = 'Third');
+        </sql>
+
+        <insert tableName="stretchy_report_parameter">
+            <column name="report_id" valueComputed="@report_id"/>
+            <column name="parameter_id" valueComputed="@third_param_id"/>
+            <column name="report_parameter_name" value="Third"/>
+        </insert>
+
+        <insert tableName="stretchy_parameter">
+            <column name="parameter_name" value="CurrentNetPay"/>
+            <column name="parameter_variable" value="CurrentNetPay"/>
+            <column name="parameter_label" value="Current Pay"/>
+            <column name="parameter_displayType" value="text"/>
+            <column name="parameter_FormatType" value="number"/>
+            <column name="parameter_default" value=""/>
+            <column name="special"/>
+            <column name="selectOne" value="N"/>
+            <column name="selectAll" value="N"/>
+        </insert>
+
+        <sql endDelimiter=";" stripComments="true">
+            SET
+            @current_pay_param_id = (SELECT id FROM stretchy_parameter WHERE parameter_name = 'CurrentNetPay');
+        </sql>
+
+        <insert tableName="stretchy_report_parameter">
+            <column name="report_id" valueComputed="@report_id"/>
+            <column name="parameter_id" valueComputed="@current_pay_param_id"/>
+            <column name="report_parameter_name" value="CurrentNetPay"/>
+        </insert>
+
+        <insert tableName="stretchy_parameter">
+            <column name="parameter_name" value="OriginalMonthlyRepayment"/>
+            <column name="parameter_variable" value="OriginalMonthlyRepayment"/>
+            <column name="parameter_label" value="Original Monthly Repayment"/>
+            <column name="parameter_displayType" value="text"/>
+            <column name="parameter_FormatType" value="number"/>
+            <column name="parameter_default" value=""/>
+            <column name="special"/>
+            <column name="selectOne" value="N"/>
+            <column name="selectAll" value="N"/>
+        </insert>
+
+        <sql endDelimiter=";" stripComments="true">
+            SET
+            @omr_param_id = (SELECT id FROM stretchy_parameter WHERE parameter_name = 'OriginalMonthlyRepayment');
+        </sql>
+
+        <insert tableName="stretchy_report_parameter">
+            <column name="report_id" valueComputed="@report_id"/>
+            <column name="parameter_id" valueComputed="@omr_param_id"/>
+            <column name="report_parameter_name" value="OriginalMonthlyRepayment"/>
+        </insert>
+
+        <insert tableName="stretchy_parameter">
+            <column name="parameter_name" value="AvailableNetSalary"/>
+            <column name="parameter_variable" value="AvailableNetSalary"/>
+            <column name="parameter_label" value="Available Net Salary"/>
+            <column name="parameter_displayType" value="text"/>
+            <column name="parameter_FormatType" value="number"/>
+            <column name="parameter_default" value=""/>
+            <column name="special"/>
+            <column name="selectOne" value="N"/>
+            <column name="selectAll" value="N"/>
+        </insert>
+
+        <sql endDelimiter=";" stripComments="true">
+            SET
+            @ans_param_id = (SELECT id FROM stretchy_parameter WHERE parameter_name = 'AvailableNetSalary');
+        </sql>
+
+        <insert tableName="stretchy_report_parameter">
+            <column name="report_id" valueComputed="@report_id"/>
+            <column name="parameter_id" valueComputed="@ans_param_id"/>
+            <column name="report_parameter_name" value="AvailableNetSalary"/>
+        </insert>
+
+        <insert tableName="stretchy_parameter">
+            <column name="parameter_name" value="NewMonthlyRepayment"/>
+            <column name="parameter_variable" value="NewMonthlyRepayment"/>
+            <column name="parameter_label" value="New Monthly Repayment"/>
+            <column name="parameter_displayType" value="text"/>
+            <column name="parameter_FormatType" value="number"/>
+            <column name="parameter_default" value=""/>
+            <column name="special"/>
+            <column name="selectOne" value="N"/>
+            <column name="selectAll" value="N"/>
+        </insert>
+
+        <sql endDelimiter=";" stripComments="true">
+            SET
+            @nmr_param_id = (SELECT id FROM stretchy_parameter WHERE parameter_name = 'NewMonthlyRepayment');
+        </sql>
+
+        <insert tableName="stretchy_report_parameter">
+            <column name="report_id" valueComputed="@report_id"/>
+            <column name="parameter_id" valueComputed="@nmr_param_id"/>
+            <column name="report_parameter_name" value="NewMonthlyRepayment"/>
+        </insert>
+
+        <insert tableName="stretchy_parameter">
+            <column name="parameter_name" value="AvailableNetPay"/>
+            <column name="parameter_variable" value="AvailableNetPay"/>
+            <column name="parameter_label" value="Available Net Pay"/>
+            <column name="parameter_displayType" value="text"/>
+            <column name="parameter_FormatType" value="number"/>
+            <column name="parameter_default" value=""/>
+            <column name="special"/>
+            <column name="selectOne" value="N"/>
+            <column name="selectAll" value="N"/>
+        </insert>
+
+        <sql endDelimiter=";" stripComments="true">
+            SET
+            @anp_param_id = (SELECT id FROM stretchy_parameter WHERE parameter_name = 'AvailableNetPay');
+        </sql>
+
+        <insert tableName="stretchy_report_parameter">
+            <column name="report_id" valueComputed="@report_id"/>
+            <column name="parameter_id" valueComputed="@anp_param_id"/>
+            <column name="report_parameter_name" value="AvailableNetPay"/>
+        </insert>
+    </changeSet>
+</databaseChangeLog>
