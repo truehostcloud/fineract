@@ -109,7 +109,7 @@
         <insert tableName="stretchy_parameter">
             <column name="parameter_name" value="Third"/>
             <column name="parameter_variable" value="Third"/>
-            <column name="parameter_label" value="Third (enter any value-will be overridden)"/>
+            <column name="parameter_label" value="Third (enter any value - will be overridden)"/>
             <column name="parameter_displayType" value="text"/>
             <column name="parameter_FormatType" value="number"/>
             <column name="parameter_default" value="0.00"/>
