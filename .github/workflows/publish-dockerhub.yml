@@ -5,6 +5,7 @@ on:
       - develop
     tags:
       - 1.*
+      
             
 permissions:
   contents: read
