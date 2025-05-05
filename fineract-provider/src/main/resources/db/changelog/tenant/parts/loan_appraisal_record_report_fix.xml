@@ -42,8 +42,8 @@
             <column name="parameter_FormatType" value="number"/>
             <column name="parameter_default" value=""/>
             <column name="special"/>
-            <column name="selectOne" valueNumeric="1"/>
-            <column name="selectAll" valueNumeric="0"/>
+            <column name="selectOne" value="Y"/>
+            <column name="selectAll" value="N"/>
             <column name="parameter_sql"
                     value="SELECT m_client.id, m_client.display_name FROM m_client JOIN m_loan ON m_client.id = m_loan.client_id GROUP BY m_client.id, m_client.display_name"/>
         </insert>
@@ -67,8 +67,8 @@
             <column name="parameter_FormatType" value="number"/>
             <column name="parameter_default" value=""/>
             <column name="special"/>
-            <column name="selectOne" valueNumeric="1"/>
-            <column name="selectAll" valueNumeric="0"/>
+            <column name="selectOne" value="Y"/>
+            <column name="selectAll" value="N"/>
             <column name="parameter_sql" value="select id, display_name from m_staff where is_loan_officer = 1"/>
         </insert>
 
@@ -91,8 +91,8 @@
             <column name="parameter_FormatType" value="number"/>
             <column name="parameter_default" value=""/>
             <column name="special"/>
-            <column name="selectOne" valueNumeric="0"/>
-            <column name="selectAll" valueNumeric="0"/>
+            <column name="selectOne" value="N"/>
+            <column name="selectAll" value="N"/>
         </insert>
 
         <sql endDelimiter=";" stripComments="true">
@@ -114,8 +114,8 @@
             <column name="parameter_FormatType" value="number"/>
             <column name="parameter_default" value="0.00"/>
             <column name="special"/>
-            <column name="selectOne" valueNumeric="0"/>
-            <column name="selectAll" valueNumeric="0"/>
+            <column name="selectOne" value="N"/>
+            <column name="selectAll" value="N"/>
         </insert>
 
         <sql endDelimiter=";" stripComments="true">
@@ -137,8 +137,8 @@
             <column name="parameter_FormatType" value="number"/>
             <column name="parameter_default" value=""/>
             <column name="special"/>
-            <column name="selectOne" valueNumeric="0"/>
-            <column name="selectAll" valueNumeric="0"/>
+            <column name="selectOne" value="N"/>
+            <column name="selectAll" value="N"/>
         </insert>
 
         <sql endDelimiter=";" stripComments="true">
@@ -160,8 +160,8 @@
             <column name="parameter_FormatType" value="number"/>
             <column name="parameter_default" value=""/>
             <column name="special"/>
-            <column name="selectOne" valueNumeric="0"/>
-            <column name="selectAll" valueNumeric="0"/>
+            <column name="selectOne" value="N"/>
+            <column name="selectAll" value="N"/>
         </insert>
 
         <sql endDelimiter=";" stripComments="true">
@@ -183,8 +183,8 @@
             <column name="parameter_FormatType" value="number"/>
             <column name="parameter_default" value=""/>
             <column name="special"/>
-            <column name="selectOne" valueNumeric="0"/>
-            <column name="selectAll" valueNumeric="0"/>
+            <column name="selectOne" value="N"/>
+            <column name="selectAll" value="N"/>
         </insert>
 
         <sql endDelimiter=";" stripComments="true">
@@ -206,8 +206,8 @@
             <column name="parameter_FormatType" value="number"/>
             <column name="parameter_default" value=""/>
             <column name="special"/>
-            <column name="selectOne" valueNumeric="0"/>
-            <column name="selectAll" valueNumeric="0"/>
+            <column name="selectOne" value="N"/>
+            <column name="selectAll" value="N"/>
         </insert>
 
         <sql endDelimiter=";" stripComments="true">
@@ -229,8 +229,8 @@
             <column name="parameter_FormatType" value="number"/>
             <column name="parameter_default" value=""/>
             <column name="special"/>
-            <column name="selectOne" valueNumeric="0"/>
-            <column name="selectAll" valueNumeric="0"/>
+            <column name="selectOne" value="N"/>
+            <column name="selectAll" value="N"/>
         </insert>
 
         <sql endDelimiter=";" stripComments="true">
