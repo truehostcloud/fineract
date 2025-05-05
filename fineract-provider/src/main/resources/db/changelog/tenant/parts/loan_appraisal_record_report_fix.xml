@@ -244,4 +244,4 @@
             <column name="report_parameter_name" value="AvailableNetPay"/>
         </insert>
     </changeSet>
-</databaseChangeLog> 
+</databaseChangeLog>
