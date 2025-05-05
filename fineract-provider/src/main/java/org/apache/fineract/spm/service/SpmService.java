@@ -44,7 +44,7 @@ public class SpmService {
     public List<Survey> fetchValidSurveys() {
         this.securityContext.authenticatedUser();
 
-        return this.surveyRepository.fetchActiveSurveys(DateUtils.getLocalDateTimeOfSystem());
+        return this.surveyRepository.fetchActiveSurveys(DateUtils.getLocalDateOfTenant());
     }
 
     public List<Survey> fetchAllSurveys() {
@@ -61,7 +61,7 @@ public class SpmService {
     public Survey createSurvey(final Survey survey) {
         this.securityContext.authenticatedUser();
         this.surveyValidator.validate(survey);
-        final Survey previousSurvey = this.surveyRepository.findByKey(survey.getKey(), DateUtils.getLocalDateTimeOfSystem());
+        final Survey previousSurvey = this.surveyRepository.findByKey(survey.getKey(), DateUtils.getLocalDateOfTenant());
 
         if (previousSurvey != null) {
             this.deactivateSurvey(previousSurvey.getId());
@@ -72,14 +72,10 @@ public class SpmService {
         survey.setValidTo(validFrom.plusYears(100));
         try {
             this.surveyRepository.saveAndFlush(survey);
-        } catch (final EntityExistsException dve) {
-            handleDataIntegrityIssues(dve, dve, survey.getKey());
-        } catch (final DataIntegrityViolationException dve) {
-            handleDataIntegrityIssues(dve.getMostSpecificCause(), dve, survey.getKey());
-        } catch (final JpaSystemException dve) {
-            handleDataIntegrityIssues(dve.getMostSpecificCause(), dve, survey.getKey());
         } catch (final PersistenceException dve) {
             handleDataIntegrityIssues(dve, dve, survey.getKey());
+        } catch (final DataIntegrityViolationException | JpaSystemException dve) {
+            handleDataIntegrityIssues(dve.getMostSpecificCause(), dve, survey.getKey());
         }
         return survey;
     }
@@ -90,9 +86,7 @@ public class SpmService {
             this.surveyRepository.saveAndFlush(survey);
         } catch (final EntityExistsException dve) {
             handleDataIntegrityIssues(dve, dve, survey.getKey());
-        } catch (final DataIntegrityViolationException dve) {
-            handleDataIntegrityIssues(dve.getMostSpecificCause(), dve, survey.getKey());
-        } catch (final JpaSystemException dve) {
+        } catch (final DataIntegrityViolationException | JpaSystemException dve) {
             handleDataIntegrityIssues(dve.getMostSpecificCause(), dve, survey.getKey());
         } catch (final PersistenceException dve) {
             handleDataIntegrityIssues(dve, dve, survey.getKey());

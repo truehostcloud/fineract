@@ -16,32 +16,29 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.fineract.spm.data;
 
+package org.apache.fineract.client.models;
+
+import com.google.gson.annotations.SerializedName;
 import java.util.Objects;
 import lombok.Getter;
 import lombok.Setter;
 
 /**
- * Model representing a survey response option for internal mapping
+ * Model representing a survey response option
  */
-@Getter
 @Setter
+@Getter
 public class ResponseData {
 
-    private Long id;
+    @SerializedName("text")
     private String text;
+
+    @SerializedName("value")
     private Integer value;
+
+    @SerializedName("sequenceNo")
     private Integer sequenceNo;
-
-    public ResponseData() {}
-
-    public ResponseData(final Long id, final String text, final Integer value, final Integer sequenceNo) {
-        this.id = id;
-        this.text = text;
-        this.value = value;
-        this.sequenceNo = sequenceNo;
-    }
 
     public ResponseData text(String text) {
         this.text = text;
@@ -63,17 +60,16 @@ public class ResponseData {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         ResponseData that = (ResponseData) o;
-        return Objects.equals(id, that.id) && Objects.equals(text, that.text) && Objects.equals(value, that.value)
-                && Objects.equals(sequenceNo, that.sequenceNo);
+        return Objects.equals(text, that.text) && Objects.equals(value, that.value) && Objects.equals(sequenceNo, that.sequenceNo);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(id, text, value, sequenceNo);
+        return Objects.hash(text, value, sequenceNo);
     }
 
     @Override
     public String toString() {
-        return "ResponseData{" + "id=" + id + ", text='" + text + '\'' + ", value=" + value + ", sequenceNo=" + sequenceNo + '}';
+        return "ResponseData{" + "text='" + text + '\'' + ", value=" + value + ", sequenceNo=" + sequenceNo + '}';
     }
 }
