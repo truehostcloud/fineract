@@ -13,7 +13,7 @@
             </sqlCheck>
         </preConditions>
 
-        <comment>Add Loan Appraisal Record report configuration with numeric boolean values</comment>
+        <comment>Add Loan Appraisal Record report configuration</comment>
 
         <!-- Add report first -->
         <insert tableName="stretchy_report">
