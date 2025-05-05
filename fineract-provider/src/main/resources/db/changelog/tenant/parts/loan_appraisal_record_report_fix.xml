@@ -22,9 +22,9 @@
             <column name="report_category" value="Loan"/>
             <column name="report_sql" value="(NULL)"/>
             <column name="description" value="Loan Appraisal Record Report"/>
-            <column name="core_report" value="0"/>
-            <column name="use_report" value="1"/>
-            <column name="self_service_user_report" value="0"/>
+            <column name="core_report" valueNumeric="0"/>
+            <column name="use_report" valueNumeric="1"/>
+            <column name="self_service_user_report" valueNumeric="0"/>
         </insert>
 
         <!-- Store the report ID in a variable -->
