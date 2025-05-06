@@ -63,6 +63,7 @@ import org.apache.fineract.portfolio.calendar.exception.NotValidRecurringDateExc
 import org.apache.fineract.portfolio.client.domain.Client;
 import org.apache.fineract.portfolio.client.exception.ClientNotActiveException;
 import org.apache.fineract.portfolio.collateralmanagement.exception.LoanCollateralAmountNotSufficientException;
+import org.apache.fineract.portfolio.common.service.Validator;
 import org.apache.fineract.portfolio.group.domain.Group;
 import org.apache.fineract.portfolio.group.exception.GroupNotActiveException;
 import org.apache.fineract.portfolio.loanaccount.api.LoanApiConstants;
@@ -92,9 +93,9 @@ import org.apache.fineract.portfolio.loanproduct.domain.LoanProduct;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.stereotype.Component;
 
-@Component
+@Component("loanTransactionValidator")
 @AllArgsConstructor
-public final class LoanTransactionValidator {
+public final class LoanTransactionValidatorImpl implements LoanTransactionValidator {
 
     private final FromJsonHelper fromApiJsonHelper;
     private final LoanApplicationValidator fromApiJsonDeserializer;
@@ -113,6 +114,7 @@ public final class LoanTransactionValidator {
         }
     }
 
+    @Override
     public void validateDisbursement(JsonCommand command, boolean isAccountTransfer, Long loanId) {
         String json = command.json();
         if (StringUtils.isBlank(json)) {
@@ -122,7 +124,7 @@ public final class LoanTransactionValidator {
         final Type typeOfMap = new TypeToken<Map<String, Object>>() {}.getType();
         this.fromApiJsonHelper.checkForUnsupportedParameters(typeOfMap, json, getDisbursementParameters(isAccountTransfer));
 
-        LoanApplicationValidator.validateOrThrow("loan.disbursement", baseDataValidator -> {
+        Validator.validateOrThrow("loan.disbursement", baseDataValidator -> {
             final JsonElement element = this.fromApiJsonHelper.parse(json);
             final LocalDate actualDisbursementDate = this.fromApiJsonHelper.extractLocalDateNamed("actualDisbursementDate", element);
             baseDataValidator.reset().parameter("actualDisbursementDate").value(actualDisbursementDate).notNull();
@@ -236,7 +238,7 @@ public final class LoanTransactionValidator {
         });
     }
 
-    public void validateDisbursementWithPostDatedChecks(final String json, final Long loanId) {
+    private void validateDisbursementWithPostDatedChecks(final String json, final Long loanId) {
         final JsonElement jsonElement = this.fromApiJsonHelper.parse(json);
         final List<ApiParameterError> dataValidationErrors = new ArrayList<>();
         final DataValidatorBuilder baseDataValidator = new DataValidatorBuilder(dataValidationErrors).resource("loan.disbursement");
@@ -282,7 +284,7 @@ public final class LoanTransactionValidator {
         }
     }
 
-    public void validateDisbursementDateWithMeetingDate(final LocalDate actualDisbursementDate, final CalendarInstance calendarInstance,
+    private void validateDisbursementDateWithMeetingDate(final LocalDate actualDisbursementDate, final CalendarInstance calendarInstance,
             Boolean isSkipRepaymentOnFirstMonth, Integer numberOfDays) {
         if (null != calendarInstance) {
             final Calendar calendar = calendarInstance.getCalendar();
@@ -296,6 +298,7 @@ public final class LoanTransactionValidator {
         }
     }
 
+    @Override
     public void validateUndoChargeOff(final String json) {
         if (!StringUtils.isBlank(json)) {
             final Set<String> transactionParameters = new HashSet<>(Arrays.asList(LoanApiConstants.REVERSAL_EXTERNAL_ID_PARAMNAME));
@@ -317,6 +320,7 @@ public final class LoanTransactionValidator {
         }
     }
 
+    @Override
     public void validateTransaction(final String json) {
 
         if (StringUtils.isBlank(json)) {
@@ -352,6 +356,7 @@ public final class LoanTransactionValidator {
         throwExceptionIfValidationWarningsExist(dataValidationErrors);
     }
 
+    @Override
     public void validateChargebackTransaction(final String json) {
 
         if (StringUtils.isBlank(json)) {
@@ -382,10 +387,12 @@ public final class LoanTransactionValidator {
         throwExceptionIfValidationWarningsExist(dataValidationErrors);
     }
 
+    @Override
     public void validateNewRepaymentTransaction(final String json) {
         validatePaymentTransaction(json);
     }
 
+    @Override
     public void validateTransactionWithNoAmount(final String json) {
         if (StringUtils.isBlank(json)) {
             throw new InvalidJsonException();
@@ -413,6 +420,7 @@ public final class LoanTransactionValidator {
         throwExceptionIfValidationWarningsExist(dataValidationErrors);
     }
 
+    @Override
     public void validateChargeOffTransaction(final String json) {
         if (StringUtils.isBlank(json)) {
             throw new InvalidJsonException();
@@ -443,6 +451,7 @@ public final class LoanTransactionValidator {
         throwExceptionIfValidationWarningsExist(dataValidationErrors);
     }
 
+    @Override
     public void validateUpdateOfLoanOfficer(final String json) {
         if (StringUtils.isBlank(json)) {
             throw new InvalidJsonException();
@@ -473,6 +482,7 @@ public final class LoanTransactionValidator {
         throwExceptionIfValidationWarningsExist(dataValidationErrors);
     }
 
+    @Override
     public void validateForBulkLoanReassignment(final String json) {
         if (StringUtils.isBlank(json)) {
             throw new InvalidJsonException();
@@ -501,6 +511,7 @@ public final class LoanTransactionValidator {
         throwExceptionIfValidationWarningsExist(dataValidationErrors);
     }
 
+    @Override
     public void validateMarkAsFraudLoan(final String json) {
         if (StringUtils.isBlank(json)) {
             return;
@@ -522,6 +533,7 @@ public final class LoanTransactionValidator {
         throwExceptionIfValidationWarningsExist(dataValidationErrors);
     }
 
+    @Override
     public void validateUpdateDisbursementDateAndAmount(final String json, LoanDisbursementDetails loanDisbursementDetails) {
 
         if (StringUtils.isBlank(json)) {
@@ -561,6 +573,7 @@ public final class LoanTransactionValidator {
         throwExceptionIfValidationWarningsExist(dataValidationErrors);
     }
 
+    @Override
     public void validateNewRefundTransaction(final String json) {
 
         if (StringUtils.isBlank(json)) {
@@ -593,6 +606,7 @@ public final class LoanTransactionValidator {
         throwExceptionIfValidationWarningsExist(dataValidationErrors);
     }
 
+    @Override
     public void validateLoanForeclosure(final String json) {
 
         if (StringUtils.isBlank(json)) {
@@ -622,6 +636,7 @@ public final class LoanTransactionValidator {
         throwExceptionIfValidationWarningsExist(dataValidationErrors);
     }
 
+    @Override
     public void validateLoanClientIsActive(final Loan loan) {
         final Client client = loan.client();
         if (client != null && client.isNotActive()) {
@@ -629,6 +644,7 @@ public final class LoanTransactionValidator {
         }
     }
 
+    @Override
     public void validateLoanGroupIsActive(final Loan loan) {
         final Group group = loan.group();
         if (group != null && group.isNotActive()) {
@@ -636,7 +652,7 @@ public final class LoanTransactionValidator {
         }
     }
 
-    public void validateLoanHasNoLaterChargeRefundTransactionToReverseOrCreateATransaction(Loan loan, LocalDate transactionDate,
+    private void validateLoanHasNoLaterChargeRefundTransactionToReverseOrCreateATransaction(Loan loan, LocalDate transactionDate,
             String reversedOrCreated) {
         for (LoanTransaction txn : loan.getLoanTransactions()) {
             if (txn.isChargeRefund() && DateUtils.isBefore(transactionDate, txn.getTransactionDate())) {
@@ -648,7 +664,7 @@ public final class LoanTransactionValidator {
         }
     }
 
-    public void validateLoanDisbursementIsBeforeTransactionDate(final Loan loan, final LocalDate transactionDate) {
+    private void validateLoanDisbursementIsBeforeTransactionDate(final Loan loan, final LocalDate transactionDate) {
         if (DateUtils.isBefore(transactionDate, loan.getDisbursementDate())) {
             final String errorMessage = "The transaction date cannot be before the loan disbursement date: "
                     + loan.getDisbursementDate().toString();
@@ -657,14 +673,14 @@ public final class LoanTransactionValidator {
         }
     }
 
-    public void validateTransactionShouldNotBeInTheFuture(final LocalDate transactionDate) {
+    private void validateTransactionShouldNotBeInTheFuture(final LocalDate transactionDate) {
         if (DateUtils.isDateInTheFuture(transactionDate)) {
             final String errorMessage = "The transaction date cannot be in the future.";
             throw new InvalidLoanStateTransitionException("transaction", "cannot.be.a.future.date", errorMessage, transactionDate);
         }
     }
 
-    public void validateLoanHasCurrency(final Loan loan) {
+    private void validateLoanHasCurrency(final Loan loan) {
         MonetaryCurrency currency = loan.getCurrency();
         final ApplicationCurrency defaultApplicationCurrency = this.applicationCurrencyRepository.findOneByCode(currency.getCode());
         if (defaultApplicationCurrency == null) {
@@ -672,7 +688,7 @@ public final class LoanTransactionValidator {
         }
     }
 
-    public void validateClientOfficeJoiningDateIsBeforeTransactionDate(Loan loan, LocalDate transactionDate) {
+    private void validateClientOfficeJoiningDateIsBeforeTransactionDate(Loan loan, LocalDate transactionDate) {
         if (loan.getClient() != null && loan.getClient().getOfficeJoiningDate() != null) {
             final LocalDate clientOfficeJoiningDate = loan.getClient().getOfficeJoiningDate();
             if (DateUtils.isBefore(transactionDate, clientOfficeJoiningDate)) {
@@ -684,6 +700,7 @@ public final class LoanTransactionValidator {
         }
     }
 
+    @Override
     public void validateActivityNotBeforeLastTransactionDate(final Loan loan, final LocalDate activityDate, final LoanEvent event) {
         if (!(loan.isInterestBearingAndInterestRecalculationEnabled() || loan.loanProduct().isHoldGuaranteeFunds())
                 || !loan.getLoanRepaymentScheduleDetail().getLoanScheduleType().equals(LoanScheduleType.CUMULATIVE)) {
@@ -717,6 +734,7 @@ public final class LoanTransactionValidator {
         }
     }
 
+    @Override
     public void validateRepaymentDateIsOnNonWorkingDay(final LocalDate repaymentDate, final WorkingDays workingDays,
             final boolean allowTransactionsOnNonWorkingDay) {
         if (!allowTransactionsOnNonWorkingDay && !WorkingDaysUtil.isWorkingDay(workingDays, repaymentDate)) {
@@ -725,6 +743,7 @@ public final class LoanTransactionValidator {
         }
     }
 
+    @Override
     public void validateRepaymentDateIsOnHoliday(final LocalDate repaymentDate, final boolean allowTransactionsOnHoliday,
             final List<Holiday> holidays) {
         if (!allowTransactionsOnHoliday && HolidayUtil.isHoliday(repaymentDate, holidays)) {
@@ -733,7 +752,7 @@ public final class LoanTransactionValidator {
         }
     }
 
-    public void validateTransactionAmountNotExceedThresholdForMultiDisburseLoan(Loan loan) {
+    private void validateTransactionAmountNotExceedThresholdForMultiDisburseLoan(Loan loan) {
         if (loan.getLoanProduct().isMultiDisburseLoan()) {
             BigDecimal totalDisbursed = loan.getDisbursedAmount();
             BigDecimal totalPrincipalAdjusted = loan.getSummary().getTotalPrincipalAdjustments();
@@ -745,6 +764,7 @@ public final class LoanTransactionValidator {
         }
     }
 
+    @Override
     public void validateLoanTransactionInterestPaymentWaiver(JsonCommand command) {
         final Long loanId = command.getLoanId();
         Loan loan = this.loanRepository.findById(loanId).orElseThrow(() -> new LoanNotFoundException(loanId));
@@ -767,6 +787,7 @@ public final class LoanTransactionValidator {
         validateTransactionAmountNotExceedThresholdForMultiDisburseLoan(loan);
     }
 
+    @Override
     public void validateLoanTransactionInterestPaymentWaiverAfterRecalculation(Loan loan) {
         // Payment allocation calculates the new total principal repaid, and it should be validated after recalculation
         if (loan.getLoanProduct().isMultiDisburseLoan()) {
@@ -781,10 +802,12 @@ public final class LoanTransactionValidator {
         }
     }
 
+    @Override
     public void validateRefund(String json) {
         validatePaymentTransaction(json);
     }
 
+    @Override
     public void validateRefund(final Loan loan, LoanTransactionType loanTransactionType, final LocalDate transactionDate,
             ScheduleGeneratorDTO scheduleGeneratorDTO) {
         checkClientOrGroupActive(loan);
@@ -800,7 +823,7 @@ public final class LoanTransactionValidator {
         validateTransactionAmountNotExceedThresholdForMultiDisburseLoan(loan);
     }
 
-    public void validateRepaymentTypeTransactionNotBeforeAChargeRefund(final Loan loan, final LoanTransactionType loanTransactionType,
+    private void validateRepaymentTypeTransactionNotBeforeAChargeRefund(final Loan loan, final LoanTransactionType loanTransactionType,
             final LocalDate transactionDate) {
         if (loanTransactionType.isRepaymentType() && !loanTransactionType.isChargeRefund()) {
             for (LoanTransaction txn : loan.getLoanTransactions()) {
@@ -813,6 +836,7 @@ public final class LoanTransactionValidator {
         }
     }
 
+    @Override
     public void validateRefundDateIsAfterLastRepayment(final Loan loan, final LocalDate refundTransactionDate) {
         final LocalDate possibleNextRefundDate = loan.possibleNextRefundDate();
 
@@ -821,6 +845,7 @@ public final class LoanTransactionValidator {
         }
     }
 
+    @Override
     public void validateActivityNotBeforeClientOrGroupTransferDate(final Loan loan, final LoanEvent event, final LocalDate activityDate) {
         if (loan.getClient() != null && loan.getClient().getOfficeJoiningDate() != null) {
             final LocalDate clientOfficeJoiningDate = loan.getClient().getOfficeJoiningDate();
@@ -944,7 +969,8 @@ public final class LoanTransactionValidator {
         throwExceptionIfValidationWarningsExist(dataValidationErrors);
     }
 
-    private void validatePaymentDetails(final DataValidatorBuilder baseDataValidator, final JsonElement element) {
+    @Override
+    public void validatePaymentDetails(final DataValidatorBuilder baseDataValidator, final JsonElement element) {
         // Validate all string payment detail fields for max length
         final Integer paymentTypeId = this.fromApiJsonHelper.extractIntegerWithLocaleNamed("paymentTypeId", element);
 
@@ -1013,6 +1039,7 @@ public final class LoanTransactionValidator {
         }
     }
 
+    @Override
     public void validateIfTransactionIsChargeback(final LoanTransaction chargebackTransaction) {
         if (!chargebackTransaction.isChargeback()) {
             final String errorMessage = "A transaction of type chargeback was expected but not received.";
@@ -1020,6 +1047,7 @@ public final class LoanTransactionValidator {
         }
     }
 
+    @Override
     public void validateLoanRescheduleDate(final Loan loan) {
         if (DateUtils.isBefore(loan.getRescheduledOnDate(), loan.getDisbursementDate())) {
             final String errorMessage = "The date on which a loan is rescheduled cannot be before the loan disbursement date: "
@@ -1032,6 +1060,22 @@ public final class LoanTransactionValidator {
             final String errorMessage = "The date on which a loan is rescheduled cannot be in the future.";
             throw new InvalidLoanStateTransitionException("close.reschedule", "cannot.be.a.future.date", errorMessage,
                     loan.getRescheduledOnDate());
+        }
+    }
+
+    @Override
+    public void validateNote(final DataValidatorBuilder baseDataValidator, final JsonElement element) {
+        final String note = this.fromApiJsonHelper.extractStringNamed("note", element);
+        if (StringUtils.isNotBlank(note)) {
+            baseDataValidator.reset().parameter("note").value(note).notExceedingLengthOf(1000);
+        }
+    }
+
+    @Override
+    public void validateExternalId(final DataValidatorBuilder baseDataValidator, final JsonElement element) {
+        final String externalId = this.fromApiJsonHelper.extractStringNamed("externalId", element);
+        if (StringUtils.isNotBlank(externalId)) {
+            baseDataValidator.reset().parameter("externalId").value(externalId).notExceedingLengthOf(100);
         }
     }
 }

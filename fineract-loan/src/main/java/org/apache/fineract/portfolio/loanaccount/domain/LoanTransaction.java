@@ -306,6 +306,12 @@ public class LoanTransaction extends AbstractAuditableWithUTCDateTimeCustom<Long
         return newTransaction;
     }
 
+    public static LoanTransaction capitalizedIncome(final Loan loan, final Money amount, final PaymentDetail paymentDetail,
+            final LocalDate transactionDate, final ExternalId externalId) {
+        return new LoanTransaction(loan, loan.getOffice(), LoanTransactionType.CAPITALIZED_INCOME, transactionDate, amount.getAmount(),
+                amount.getAmount(), null, null, null, null, false, paymentDetail, externalId);
+    }
+
     public LoanTransaction copyTransactionPropertiesAndMappings() {
         LoanTransaction newTransaction = copyTransactionProperties(this);
         newTransaction.updateLoanTransactionToRepaymentScheduleMappings(loanTransactionToRepaymentScheduleMappings);
@@ -624,6 +630,10 @@ public class LoanTransaction extends AbstractAuditableWithUTCDateTimeCustom<Long
 
     public boolean isChargesWaiver() {
         return LoanTransactionType.WAIVE_CHARGES.equals(getTypeOf()) && isNotReversed();
+    }
+
+    public boolean isCapitalizedIncome() {
+        return LoanTransactionType.CAPITALIZED_INCOME.equals(getTypeOf()) && isNotReversed();
     }
 
     public boolean isWaiver() {
