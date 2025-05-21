@@ -24,6 +24,7 @@ import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.fineract.client.models.BatchResponse;
@@ -75,6 +76,10 @@ public final class ErrorMessageHelper {
         return "Loan: [0-9]* disbursement is not allowed on charged-off loan.";
     }
 
+    public static String disburseIsNotAllowedFailure() {
+        return "Loan Disbursal is not allowed. Loan Account is not in approved and not disbursed state.";
+    }
+
     public static String loanSubmitDateInFutureFailureMsg() {
         return "The date on which a loan is submitted cannot be in the future.";
     }
@@ -121,7 +126,7 @@ public final class ErrorMessageHelper {
                 loanIdStr);
     }
 
-    public static String chargeOffUndoFailureDueToMonetaryActivityBefore(Long loanId) {
+    public static String chargeOffFailureDueToMonetaryActivityBefore(Long loanId) {
         String loanIdStr = String.valueOf(loanId);
         return String.format("Loan: %s charge-off cannot be executed. Loan has monetary activity after the charge-off transaction date!",
                 loanIdStr);
@@ -510,6 +515,13 @@ public final class ErrorMessageHelper {
 
     public static String wrongValueInLineInJournalEntries(String resourceId, int line, List<List<List<String>>> actualList,
             List<String> expected) {
+        String actual = actualList.stream().map(Object::toString).collect(Collectors.joining(System.lineSeparator()));
+        return String.format("%nWrong value in Journal entries of resource %s line %s." //
+                + "%nActual values for the possible transactions in line (with the same date) are: %n%s %nExpected values in line: %n%s",
+                resourceId, line, actual, expected);
+    }
+
+    public static String wrongValueInLineInJournalEntry(String resourceId, int line, List<List<String>> actualList, List<String> expected) {
         String actual = actualList.stream().map(Object::toString).collect(Collectors.joining(System.lineSeparator()));
         return String.format("%nWrong value in Journal entries of resource %s line %s." //
                 + "%nActual values for the possible transactions in line (with the same date) are: %n%s %nExpected values in line: %n%s",
@@ -909,5 +921,27 @@ public final class ErrorMessageHelper {
 
     public static String wrongValueInTotalPages(Integer actual, Integer expected) {
         return String.format("Wrong value for Total pages. %nActual value is: %s %nExpected value is: %s", actual, expected);
+    }
+
+    public static String wrongValueInLineInDisbursementDetailsTab(String resourceId, int line, Set<List<String>> actualList,
+            List<String> expected) {
+        String actual = actualList.stream().map(Object::toString).collect(Collectors.joining(System.lineSeparator()));
+        return String.format("%nWrong value in Loan Tranche Details tab of resource %s line %s." //
+                + "%nActual values in line (with the same date) are: %n%s %nExpected values in line: %n%s", resourceId, line, actual,
+                expected);
+    }
+
+    public static String nrOfLinesWrongInLoanTrancheDetailsTab(String resourceId, int actual, int expected) {
+        return String.format("%nNumber of lines does not match in Loan Tranche Details tab and expected datatable of resource %s." //
+                + "%nNumber of disbursement details tab lines: %s %nNumber of expected datatable lines: %s%n", resourceId, actual,
+                expected);
+    }
+
+    public static String addInterestPauseForNotInterestBearingLoanFailure() {
+        return "Interest pause is only supported for interest bearing loans.";
+    }
+
+    public static String addInterestPauseForNotInactiveLoanFailure() {
+        return "Operations on interest pauses are restricted to active loans.";
     }
 }

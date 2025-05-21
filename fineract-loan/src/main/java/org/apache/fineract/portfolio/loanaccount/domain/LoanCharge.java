@@ -117,9 +117,11 @@ public class LoanCharge extends AbstractAuditableWithUTCDateTimeCustom<Long> {
     @Column(name = "is_penalty", nullable = false)
     private boolean penaltyCharge = false;
 
+    @Setter
     @Column(name = "is_paid_derived", nullable = false)
     private boolean paid = false;
 
+    @Setter
     @Column(name = "waived", nullable = false)
     private boolean waived = false;
 
@@ -201,8 +203,8 @@ public class LoanCharge extends AbstractAuditableWithUTCDateTimeCustom<Long> {
         this.externalId = externalId;
     }
 
-    private void populateDerivedFields(final BigDecimal amountPercentageAppliedTo, final BigDecimal chargeAmount,
-            Integer numberOfRepayments, BigDecimal loanCharge) {
+    public void populateDerivedFields(final BigDecimal amountPercentageAppliedTo, final BigDecimal chargeAmount, Integer numberOfRepayments,
+            BigDecimal loanCharge) {
 
         switch (ChargeCalculationType.fromInt(this.chargeCalculation)) {
             case INVALID:
@@ -290,7 +292,8 @@ public class LoanCharge extends AbstractAuditableWithUTCDateTimeCustom<Long> {
     public Money waive(final MonetaryCurrency currency, final Integer loanInstallmentNumber) {
         if (isInstalmentFee()) {
             final LoanInstallmentCharge chargePerInstallment = getInstallmentLoanCharge(loanInstallmentNumber);
-            final Money amountWaived = chargePerInstallment.waive(currency);
+            chargePerInstallment.waive();
+            final Money amountWaived = chargePerInstallment.getAmountWaived(currency);
             if (this.amountWaived == null) {
                 this.amountWaived = BigDecimal.ZERO;
             }
@@ -308,6 +311,25 @@ public class LoanCharge extends AbstractAuditableWithUTCDateTimeCustom<Long> {
         this.waived = true;
         return getAmountWaived(currency);
 
+    }
+
+    public void undoWaive(final MonetaryCurrency currency, final Integer loanInstallmentNumber) {
+        if (isInstalmentFee()) {
+            final LoanInstallmentCharge chargePerInstallment = getInstallmentLoanCharge(loanInstallmentNumber);
+            chargePerInstallment.undoWaive();
+            Money amountReversed = chargePerInstallment.getAmountOutstanding(currency);
+            this.amountWaived = this.amountWaived.subtract(amountReversed.getAmount());
+            this.amountOutstanding = this.amountOutstanding.add(amountReversed.getAmount());
+            if (!determineIfFullyPaid()) {
+                this.paid = false;
+                this.waived = false;
+            }
+            return;
+        }
+        this.amountOutstanding = this.amountWaived;
+        this.amountWaived = BigDecimal.ZERO;
+        this.paid = false;
+        this.waived = false;
     }
 
     private BigDecimal calculateAmountOutstanding(final MonetaryCurrency currency) {
@@ -434,7 +456,7 @@ public class LoanCharge extends AbstractAuditableWithUTCDateTimeCustom<Long> {
                     this.amountPercentageAppliedTo = amount;
                     loanCharge = BigDecimal.ZERO;
                     if (isInstalmentFee()) {
-                        loanCharge = this.loan.calculatePerInstallmentChargeAmount(ChargeCalculationType.fromInt(this.chargeCalculation),
+                        loanCharge = calculatePerInstallmentChargeAmount(loan, ChargeCalculationType.fromInt(this.chargeCalculation),
                                 this.percentage);
                     }
                     if (loanCharge.compareTo(BigDecimal.ZERO) == 0) {
@@ -452,9 +474,67 @@ public class LoanCharge extends AbstractAuditableWithUTCDateTimeCustom<Long> {
         return actualChanges;
     }
 
+    public static BigDecimal calculatePerInstallmentChargeAmount(final Loan loan, final ChargeCalculationType calculationType,
+            final BigDecimal percentage) {
+        Money amount = Money.zero(loan.getCurrency());
+        List<LoanRepaymentScheduleInstallment> installments = loan.getRepaymentScheduleInstallments();
+        for (final LoanRepaymentScheduleInstallment installment : installments) {
+            amount = amount.plus(calculateInstallmentChargeAmount(loan, calculationType, percentage, installment));
+        }
+        return amount.getAmount();
+    }
+
+    public BigDecimal calculatePerInstallmentChargeAmount() {
+        Loan loan = this.loan;
+        Money amount = Money.zero(loan.getCurrency());
+        List<LoanRepaymentScheduleInstallment> installments = loan.getRepaymentScheduleInstallments();
+        for (final LoanRepaymentScheduleInstallment installment : installments) {
+            amount = amount.plus(calculateInstallmentChargeAmount(loan, getChargeCalculation(), getPercentage(), installment));
+        }
+        return amount.getAmount();
+    }
+
+    private List<LoanInstallmentCharge> generateInstallmentLoanCharges(final LoanCharge loanCharge) {
+        Loan loan = this.loan;
+        final List<LoanInstallmentCharge> loanChargePerInstallments = new ArrayList<>();
+        if (loanCharge.isInstalmentFee()) {
+            List<LoanRepaymentScheduleInstallment> installments = loan.getRepaymentScheduleInstallments();
+            for (final LoanRepaymentScheduleInstallment installment : installments) {
+                if (installment.isRecalculatedInterestComponent()) {
+                    continue;
+                }
+                BigDecimal amount;
+                if (loanCharge.getChargeCalculation().isFlat()) {
+                    amount = loanCharge.amountOrPercentage();
+                } else {
+                    amount = calculateInstallmentChargeAmount(loan, loanCharge.getChargeCalculation(), loanCharge.getPercentage(),
+                            installment).getAmount();
+                }
+                final LoanInstallmentCharge loanInstallmentCharge = new LoanInstallmentCharge(amount, loanCharge, installment);
+                installment.getInstallmentCharges().add(loanInstallmentCharge);
+                loanChargePerInstallments.add(loanInstallmentCharge);
+            }
+        }
+        return loanChargePerInstallments;
+    }
+
+    private static Money calculateInstallmentChargeAmount(final Loan loan, final ChargeCalculationType calculationType,
+            final BigDecimal percentage, final LoanRepaymentScheduleInstallment installment) {
+        Money percentOf = switch (calculationType) {
+            case PERCENT_OF_AMOUNT -> installment.getPrincipal(loan.getCurrency());
+            case PERCENT_OF_AMOUNT_AND_INTEREST ->
+                installment.getPrincipal(loan.getCurrency()).plus(installment.getInterestCharged(loan.getCurrency()));
+            case PERCENT_OF_INTEREST -> installment.getInterestCharged(loan.getCurrency());
+            case PERCENT_OF_DISBURSEMENT_AMOUNT, INVALID, FLAT -> Money.zero(loan.getCurrency());
+
+        };
+        return Money.zero(loan.getCurrency()) //
+                .plus(LoanCharge.percentageOf(percentOf.getAmount(), percentage));
+    }
+
     private void updateInstallmentCharges() {
         final Collection<LoanInstallmentCharge> remove = new HashSet<>();
-        final List<LoanInstallmentCharge> newChargeInstallments = this.loan.generateInstallmentLoanCharges(this);
+        final List<LoanInstallmentCharge> newChargeInstallments = generateInstallmentLoanCharges(this);
         if (this.loanInstallmentCharge.isEmpty()) {
             this.loanInstallmentCharge.addAll(newChargeInstallments);
         } else {
