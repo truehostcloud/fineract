@@ -36,4 +36,6 @@ public class SmsCampaignParamReq implements Serializable {
     private Integer loanOfficerId;
     private Integer transactionId;
     private String reportName;
+    private Integer fromX;
+    private Integer toY;
 }
