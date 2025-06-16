@@ -53,6 +53,7 @@ public class ProgressiveLoanSummaryDataProvider extends CommonLoanSummaryDataPro
     private final AdvancedPaymentScheduleTransactionProcessor advancedPaymentScheduleTransactionProcessor;
     private final EMICalculator emiCalculator;
     private final LoanRepositoryWrapper loanRepository;
+    private final LoanTransactionService loanTransactionService;
     private final InterestScheduleModelRepositoryWrapper modelRepository;
 
     @Override
@@ -80,8 +81,8 @@ public class ProgressiveLoanSummaryDataProvider extends CommonLoanSummaryDataPro
     }
 
     private ProgressiveLoanInterestScheduleModel calculateModel(Loan loan, LocalDate businessDate) {
-        List<LoanTransaction> transactionsToReprocess = loan.retrieveListOfTransactionsForReprocessing().stream()
-                .filter(t -> !t.isAccrualActivity()).toList();
+        final List<LoanTransaction> transactionsToReprocess = loanTransactionService.retrieveListOfTransactionsForReprocessing(loan)
+                .stream().filter(t -> !t.isAccrualActivity()).toList();
         Pair<ChangedTransactionDetail, ProgressiveLoanInterestScheduleModel> changedTransactionDetailProgressiveLoanInterestScheduleModelPair = advancedPaymentScheduleTransactionProcessor
                 .reprocessProgressiveLoanTransactions(loan.getDisbursementDate(), businessDate, transactionsToReprocess, loan.getCurrency(),
                         loan.getRepaymentScheduleInstallments(), loan.getActiveCharges());
@@ -108,7 +109,7 @@ public class ProgressiveLoanSummaryDataProvider extends CommonLoanSummaryDataPro
         Optional<LoanRepaymentScheduleInstallment> currentRepaymentPeriod = getRelatedRepaymentScheduleInstallment(loan, businessDate);
 
         if (currentRepaymentPeriod.isPresent()) {
-            if (loan.isChargedOff()) {
+            if (loan.isChargedOff() || loan.hasContractTerminationTransaction()) {
                 return MathUtil.subtractToZero(currentRepaymentPeriod.get().getInterestOutstanding(loan.getCurrency()).getAmount(),
                         totalUnpaidPayableDueInterest);
             } else {

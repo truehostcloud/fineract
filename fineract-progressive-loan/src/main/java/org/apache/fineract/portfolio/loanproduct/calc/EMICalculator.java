@@ -66,6 +66,12 @@ public interface EMICalculator {
     void addDisbursement(ProgressiveLoanInterestScheduleModel scheduleModel, LocalDate disbursementDueDate, Money disbursedAmount);
 
     /**
+     * Applies the capitalized income transaction on the interest model. This method recalculates the EMI amounts from
+     * the action date.
+     */
+    void addCapitalizedIncome(ProgressiveLoanInterestScheduleModel scheduleModel, LocalDate transactionDueDate, Money transactionAmount);
+
+    /**
      * Applies the interest rate change on the interest model. This method recalculates the EMI amounts from the action
      * date.
      */
@@ -93,17 +99,16 @@ public interface EMICalculator {
             Money principalAmount);
 
     /**
-     * This method used for charge back principal portion. This method increases the outstanding balance. This method
-     * creates a calculated "virtual" EMI for the applied period.
+     * This method used for credit principal portion. This method increases the outstanding balance. This method creates
+     * a calculated "virtual" EMI for the applied period.
      */
-    void chargebackPrincipal(ProgressiveLoanInterestScheduleModel scheduleModel, LocalDate transactionDate,
-            Money chargebackPrincipalAmount);
+    void creditPrincipal(ProgressiveLoanInterestScheduleModel scheduleModel, LocalDate transactionDate, Money creditedPrincipalAmount);
 
     /**
-     * This method used for charge back interest portion. This method adds extra interest due. This method creates a
+     * This method used for credit interest portion. This method adds extra interest due. This method creates a
      * calculated "virtual" EMI for the applied period.
      */
-    void chargebackInterest(ProgressiveLoanInterestScheduleModel scheduleModel, LocalDate transactionDate, Money chargebackInterestAmount);
+    void creditInterest(ProgressiveLoanInterestScheduleModel scheduleModel, LocalDate transactionDate, Money creditedInterestAmount);
 
     /**
      * This method gives back the maximum of the due principal and maximum of the due interest for a requested day.

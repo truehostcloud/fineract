@@ -87,6 +87,7 @@ import org.apache.fineract.client.models.RetrieveLoansPointInTimeRequest;
 import org.apache.fineract.client.util.CallFailedRuntimeException;
 import org.apache.fineract.client.util.Calls;
 import org.apache.fineract.infrastructure.configuration.api.GlobalConfigurationConstants;
+import org.apache.fineract.infrastructure.event.external.service.validation.ExternalEventDTO;
 import org.apache.fineract.integrationtests.client.IntegrationTest;
 import org.apache.fineract.integrationtests.common.BatchHelper;
 import org.apache.fineract.integrationtests.common.BusinessDateHelper;
@@ -99,6 +100,9 @@ import org.apache.fineract.integrationtests.common.accounting.AccountHelper;
 import org.apache.fineract.integrationtests.common.accounting.JournalEntryHelper;
 import org.apache.fineract.integrationtests.common.charges.ChargesHelper;
 import org.apache.fineract.integrationtests.common.error.ErrorResponse;
+import org.apache.fineract.integrationtests.common.externalevents.BusinessEvent;
+import org.apache.fineract.integrationtests.common.externalevents.ExternalEventHelper;
+import org.apache.fineract.integrationtests.common.externalevents.ExternalEventsExtension;
 import org.apache.fineract.integrationtests.common.loans.LoanAccountLockHelper;
 import org.apache.fineract.integrationtests.common.loans.LoanProductHelper;
 import org.apache.fineract.integrationtests.common.loans.LoanProductTestBuilder;
@@ -119,7 +123,7 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.extension.ExtendWith;
 
 @Slf4j
-@ExtendWith(LoanTestLifecycleExtension.class)
+@ExtendWith({ LoanTestLifecycleExtension.class, ExternalEventsExtension.class })
 public abstract class BaseLoanIntegrationTest extends IntegrationTest {
 
     protected static final String DATETIME_PATTERN = "dd MMMM yyyy";
@@ -171,28 +175,29 @@ public abstract class BaseLoanIntegrationTest extends IntegrationTest {
     protected GlobalConfigurationHelper globalConfigurationHelper = new GlobalConfigurationHelper();
     protected final CodeHelper codeHelper = new CodeHelper();
     protected final ChargesHelper chargesHelper = new ChargesHelper();
+    protected final ExternalEventHelper externalEventHelper = new ExternalEventHelper();
 
     protected static void validateRepaymentPeriod(GetLoansLoanIdResponse loanDetails, Integer index, LocalDate dueDate, double principalDue,
             double principalPaid, double principalOutstanding, double paidInAdvance, double paidLate) {
         GetLoansLoanIdRepaymentPeriod period = loanDetails.getRepaymentSchedule().getPeriods().stream()
                 .filter(p -> Objects.equals(p.getPeriod(), index)).findFirst().orElseThrow();
         assertEquals(dueDate, period.getDueDate());
-        assertEquals(principalDue, period.getPrincipalDue());
-        assertEquals(principalPaid, period.getPrincipalPaid());
-        assertEquals(principalOutstanding, period.getPrincipalOutstanding());
-        assertEquals(paidInAdvance, period.getTotalPaidInAdvanceForPeriod());
-        assertEquals(paidLate, period.getTotalPaidLateForPeriod());
+        assertEquals(principalDue, Utils.getDoubleValue(period.getPrincipalDue()));
+        assertEquals(principalPaid, Utils.getDoubleValue(period.getPrincipalPaid()));
+        assertEquals(principalOutstanding, Utils.getDoubleValue(period.getPrincipalOutstanding()));
+        assertEquals(paidInAdvance, Utils.getDoubleValue(period.getTotalPaidInAdvanceForPeriod()));
+        assertEquals(paidLate, Utils.getDoubleValue(period.getTotalPaidLateForPeriod()));
     }
 
     protected static void validateRepaymentPeriod(GetLoansLoanIdResponse loanDetails, Integer index, double principalDue,
             double principalPaid, double principalOutstanding, double paidInAdvance, double paidLate) {
         GetLoansLoanIdRepaymentPeriod period = loanDetails.getRepaymentSchedule().getPeriods().stream()
                 .filter(p -> Objects.equals(p.getPeriod(), index)).findFirst().orElseThrow();
-        assertEquals(principalDue, period.getPrincipalDue());
-        assertEquals(principalPaid, period.getPrincipalPaid());
-        assertEquals(principalOutstanding, period.getPrincipalOutstanding());
-        assertEquals(paidInAdvance, period.getTotalPaidInAdvanceForPeriod());
-        assertEquals(paidLate, period.getTotalPaidLateForPeriod());
+        assertEquals(principalDue, Utils.getDoubleValue(period.getPrincipalDue()));
+        assertEquals(principalPaid, Utils.getDoubleValue(period.getPrincipalPaid()));
+        assertEquals(principalOutstanding, Utils.getDoubleValue(period.getPrincipalOutstanding()));
+        assertEquals(paidInAdvance, Utils.getDoubleValue(period.getTotalPaidInAdvanceForPeriod()));
+        assertEquals(paidLate, Utils.getDoubleValue(period.getTotalPaidLateForPeriod()));
     }
 
     protected static void validateFullyUnpaidRepaymentPeriod(GetLoansLoanIdResponse loanDetails, Integer index, String dueDate,
@@ -233,20 +238,20 @@ public abstract class BaseLoanIntegrationTest extends IntegrationTest {
         GetLoansLoanIdRepaymentPeriod period = loanDetails.getRepaymentSchedule().getPeriods().stream()
                 .filter(p -> Objects.equals(p.getPeriod(), index)).findFirst().orElseThrow();
         assertEquals(dueDate, period.getDueDate());
-        assertEquals(principalDue, period.getPrincipalDue());
-        assertEquals(principalPaid, period.getPrincipalPaid());
-        assertEquals(principalOutstanding, period.getPrincipalOutstanding());
-        assertEquals(feeDue, period.getFeeChargesDue());
-        assertEquals(feePaid, period.getFeeChargesPaid());
-        assertEquals(feeOutstanding, period.getFeeChargesOutstanding());
-        assertEquals(penaltyDue, period.getPenaltyChargesDue());
-        assertEquals(penaltyPaid, period.getPenaltyChargesPaid());
-        assertEquals(penaltyOutstanding, period.getPenaltyChargesOutstanding());
-        assertEquals(interestDue, period.getInterestDue());
-        assertEquals(interestPaid, period.getInterestPaid());
-        assertEquals(interestOutstanding, period.getInterestOutstanding());
-        assertEquals(paidInAdvance, period.getTotalPaidInAdvanceForPeriod());
-        assertEquals(paidLate, period.getTotalPaidLateForPeriod());
+        assertEquals(principalDue, Utils.getDoubleValue(period.getPrincipalDue()));
+        assertEquals(principalPaid, Utils.getDoubleValue(period.getPrincipalPaid()));
+        assertEquals(principalOutstanding, Utils.getDoubleValue(period.getPrincipalOutstanding()));
+        assertEquals(feeDue, Utils.getDoubleValue(period.getFeeChargesDue()));
+        assertEquals(feePaid, Utils.getDoubleValue(period.getFeeChargesPaid()));
+        assertEquals(feeOutstanding, Utils.getDoubleValue(period.getFeeChargesOutstanding()));
+        assertEquals(penaltyDue, Utils.getDoubleValue(period.getPenaltyChargesDue()));
+        assertEquals(penaltyPaid, Utils.getDoubleValue(period.getPenaltyChargesPaid()));
+        assertEquals(penaltyOutstanding, Utils.getDoubleValue(period.getPenaltyChargesOutstanding()));
+        assertEquals(interestDue, Utils.getDoubleValue(period.getInterestDue()));
+        assertEquals(interestPaid, Utils.getDoubleValue(period.getInterestPaid()));
+        assertEquals(interestOutstanding, Utils.getDoubleValue(period.getInterestOutstanding()));
+        assertEquals(paidInAdvance, Utils.getDoubleValue(period.getTotalPaidInAdvanceForPeriod()));
+        assertEquals(paidLate, Utils.getDoubleValue(period.getTotalPaidLateForPeriod()));
     }
 
     /**
@@ -276,7 +281,7 @@ public abstract class BaseLoanIntegrationTest extends IntegrationTest {
     }
 
     protected GetLoansLoanIdTransactionsTemplateResponse getPrepayAmount(Long loanId, String date) {
-        return ok(fineractClient().loanTransactions.retrieveTransactionTemplate(loanId, "prepayLoan", DATETIME_PATTERN, date, "en"));
+        return ok(fineractClient().loanTransactions.retrieveTransactionTemplate(loanId, "prepayLoan", DATETIME_PATTERN, date, "en", null));
     }
 
     protected Long verifyPrepayAmountByRepayment(Long loanId, String date) {
@@ -345,8 +350,8 @@ public abstract class BaseLoanIntegrationTest extends IntegrationTest {
                 .isInterestRecalculationEnabled(true)//
                 .interestRecalculationCompoundingMethod(0)//
                 .rescheduleStrategyMethod(RescheduleStrategyMethod.ADJUST_LAST_UNPAID_PERIOD)//
-                .recalculationRestFrequencyType(RecalculationRestFrequencyType.SAME_AS_REPAYMENT_PERIOD)//
-                .recalculationRestFrequencyInterval(0)//
+                .recalculationRestFrequencyType(RecalculationRestFrequencyType.DAILY)//
+                .recalculationRestFrequencyInterval(1)//
                 .isArrearsBasedOnOriginalSchedule(false)//
                 .isCompoundingToBePostedAsTransaction(false)//
                 .preClosureInterestCalculationStrategy(1)//
@@ -408,6 +413,15 @@ public abstract class BaseLoanIntegrationTest extends IntegrationTest {
                 .enableInstallmentLevelDelinquency(false)//
                 .loanScheduleType("PROGRESSIVE")//
                 .loanScheduleProcessingType("HORIZONTAL");//
+    }
+
+    protected PostLoanProductsRequest create4IProgressiveWithCapitalizedIncome() {
+        return create4IProgressive().enableIncomeCapitalization(true)//
+                .capitalizedIncomeCalculationType(PostLoanProductsRequest.CapitalizedIncomeCalculationTypeEnum.FLAT)//
+                .capitalizedIncomeStrategy(PostLoanProductsRequest.CapitalizedIncomeStrategyEnum.EQUAL_AMORTIZATION)//
+                .deferredIncomeLiabilityAccountId(deferredIncomeLiabilityAccount.getAccountID().longValue())//
+                .incomeFromCapitalizationAccountId(feeIncomeAccount.getAccountID().longValue())//
+                .capitalizedIncomeType(PostLoanProductsRequest.CapitalizedIncomeTypeEnum.FEE);
     }
 
     // Loan product with proper accounting setup
@@ -615,7 +629,7 @@ public abstract class BaseLoanIntegrationTest extends IntegrationTest {
             Assertions.assertEquals(transactions.length, loanDetails.getTransactions().size());
             Arrays.stream(transactions).forEach(tr -> {
                 Optional<GetLoansLoanIdTransactions> optTx = loanDetails.getTransactions().stream()
-                        .filter(item -> Objects.equals(item.getAmount(), tr.amount) //
+                        .filter(item -> Objects.equals(Utils.getDoubleValue(item.getAmount()), tr.amount) //
                                 && Objects.equals(item.getType().getValue(), tr.type) //
                                 && Objects.equals(item.getDate(), LocalDate.parse(tr.date, dateTimeFormatter)))
                         .findFirst();
@@ -638,16 +652,17 @@ public abstract class BaseLoanIntegrationTest extends IntegrationTest {
         } else {
             Assertions.assertEquals(transactions.length, loanDetails.getTransactions().size(), "Number of transactions on loan " + loanId);
             Arrays.stream(transactions).forEach(tr -> {
-                boolean found = loanDetails.getTransactions().stream().anyMatch(item -> Objects.equals(item.getAmount(), tr.amount) //
-                        && Objects.equals(item.getType().getValue(), tr.type) //
-                        && Objects.equals(item.getDate(), LocalDate.parse(tr.date, dateTimeFormatter)) //
-                        && Objects.equals(item.getOutstandingLoanBalance(), tr.outstandingPrincipal) //
-                        && Objects.equals(item.getPrincipalPortion(), tr.principalPortion) //
-                        && Objects.equals(item.getInterestPortion(), tr.interestPortion) //
-                        && Objects.equals(item.getFeeChargesPortion(), tr.feePortion) //
-                        && Objects.equals(item.getPenaltyChargesPortion(), tr.penaltyPortion) //
-                        && Objects.equals(item.getOverpaymentPortion(), tr.overpaymentPortion) //
-                        && Objects.equals(item.getUnrecognizedIncomePortion(), tr.unrecognizedPortion) //
+                boolean found = loanDetails.getTransactions().stream()
+                        .anyMatch(item -> Objects.equals(Utils.getDoubleValue(item.getAmount()), tr.amount) //
+                                && Objects.equals(item.getType().getValue(), tr.type) //
+                                && Objects.equals(item.getDate(), LocalDate.parse(tr.date, dateTimeFormatter)) //
+                                && Objects.equals(Utils.getDoubleValue(item.getOutstandingLoanBalance()), tr.outstandingPrincipal) //
+                                && Objects.equals(Utils.getDoubleValue(item.getPrincipalPortion()), tr.principalPortion) //
+                                && Objects.equals(Utils.getDoubleValue(item.getInterestPortion()), tr.interestPortion) //
+                                && Objects.equals(Utils.getDoubleValue(item.getFeeChargesPortion()), tr.feePortion) //
+                                && Objects.equals(Utils.getDoubleValue(item.getPenaltyChargesPortion()), tr.penaltyPortion) //
+                                && Objects.equals(Utils.getDoubleValue(item.getOverpaymentPortion()), tr.overpaymentPortion) //
+                                && Objects.equals(Utils.getDoubleValue(item.getUnrecognizedIncomePortion()), tr.unrecognizedPortion) //
                 );
                 Assertions.assertTrue(found, "Required transaction not found: " + tr + " on loan " + loanId);
             });
@@ -823,8 +838,8 @@ public abstract class BaseLoanIntegrationTest extends IntegrationTest {
     private void verifyPeriodsEquality(List<GetLoansLoanIdRepaymentPeriod> savedPeriods, List<GetLoansLoanIdRepaymentPeriod> actualPeriods,
             int startIndex, int endIndex, boolean shouldEqual) {
         for (int i = startIndex; i < endIndex; i++) {
-            Double savedTotalDue = savedPeriods.get(i).getTotalDueForPeriod();
-            Double actualTotalDue = actualPeriods.get(i).getTotalDueForPeriod();
+            Double savedTotalDue = Utils.getDoubleValue(savedPeriods.get(i).getTotalDueForPeriod());
+            Double actualTotalDue = Utils.getDoubleValue(actualPeriods.get(i).getTotalDueForPeriod());
 
             if (shouldEqual) {
                 assertEquals(savedTotalDue, actualTotalDue, String.format(
@@ -848,19 +863,19 @@ public abstract class BaseLoanIntegrationTest extends IntegrationTest {
         int installmentNumber = 0;
         for (int i = 0; i < installments.length; i++) {
             GetLoansLoanIdRepaymentPeriod period = loanResponse.getRepaymentSchedule().getPeriods().get(i);
-            Double principalDue = period.getPrincipalDue();
+            Double principalDue = Utils.getDoubleValue(period.getPrincipalDue());
             Double amount = installments[i].principalAmount;
 
             if (installments[i].completed == null) { // this is for the disbursement
-                Assertions.assertEquals(amount, period.getPrincipalLoanBalanceOutstanding(),
+                Assertions.assertEquals(amount, Utils.getDoubleValue(period.getPrincipalLoanBalanceOutstanding()),
                         "%d. installment's principal due is different, expected: %.2f, actual: %.2f".formatted(i, amount,
-                                period.getPrincipalLoanBalanceOutstanding()));
+                                Utils.getDoubleValue(period.getPrincipalLoanBalanceOutstanding())));
             } else {
                 Assertions.assertEquals(amount, principalDue,
                         "%d. installment's principal due is different, expected: %.2f, actual: %.2f".formatted(i, amount, principalDue));
 
                 Double interestAmount = installments[i].interestAmount;
-                Double interestDue = period.getInterestDue();
+                Double interestDue = Utils.getDoubleValue(period.getInterestDue());
                 if (interestAmount != null) {
                     Assertions.assertEquals(interestAmount, interestDue,
                             "%d. installment's interest due is different, expected: %.2f, actual: %.2f".formatted(i, interestAmount,
@@ -868,14 +883,14 @@ public abstract class BaseLoanIntegrationTest extends IntegrationTest {
                 }
 
                 Double feeAmount = installments[i].feeAmount;
-                Double feeDue = period.getFeeChargesDue();
+                Double feeDue = Utils.getDoubleValue(period.getFeeChargesDue());
                 if (feeAmount != null) {
                     Assertions.assertEquals(feeAmount, feeDue,
                             "%d. installment's fee charges due is different, expected: %.2f, actual: %.2f".formatted(i, feeAmount, feeDue));
                 }
 
                 Double penaltyAmount = installments[i].penaltyAmount;
-                Double penaltyDue = period.getPenaltyChargesDue();
+                Double penaltyDue = Utils.getDoubleValue(period.getPenaltyChargesDue());
                 if (penaltyAmount != null) {
                     Assertions.assertEquals(penaltyAmount, penaltyDue,
                             "%d. installment's penalty charges due is different, expected: %.2f, actual: %.2f".formatted(i, penaltyAmount,
@@ -883,7 +898,7 @@ public abstract class BaseLoanIntegrationTest extends IntegrationTest {
                 }
 
                 Double outstandingAmount = installments[i].totalOutstandingAmount;
-                Double totalOutstanding = period.getTotalOutstandingForPeriod();
+                Double totalOutstanding = Utils.getDoubleValue(period.getTotalOutstandingForPeriod());
                 if (outstandingAmount != null) {
                     Assertions.assertEquals(outstandingAmount, totalOutstanding,
                             "%d. installment's total outstanding is different, expected: %.2f, actual: %.2f".formatted(i, outstandingAmount,
@@ -893,7 +908,7 @@ public abstract class BaseLoanIntegrationTest extends IntegrationTest {
                 Double outstandingPrincipalExpected = installments[i].outstandingAmounts != null
                         ? installments[i].outstandingAmounts.principalOutstanding
                         : null;
-                Double outstandingPrincipal = period.getPrincipalOutstanding();
+                Double outstandingPrincipal = Utils.getDoubleValue(period.getPrincipalOutstanding());
                 if (outstandingPrincipalExpected != null) {
                     Assertions.assertEquals(outstandingPrincipalExpected, outstandingPrincipal,
                             "%d. installment's outstanding principal is different, expected: %.2f, actual: %.2f".formatted(i,
@@ -903,7 +918,7 @@ public abstract class BaseLoanIntegrationTest extends IntegrationTest {
                 Double outstandingFeeExpected = installments[i].outstandingAmounts != null
                         ? installments[i].outstandingAmounts.feeOutstanding
                         : null;
-                Double outstandingFee = period.getFeeChargesOutstanding();
+                Double outstandingFee = Utils.getDoubleValue(period.getFeeChargesOutstanding());
                 if (outstandingFeeExpected != null) {
                     Assertions.assertEquals(outstandingFeeExpected, outstandingFee,
                             "%d. installment's outstanding fee is different, expected: %.2f, actual: %.2f".formatted(i,
@@ -913,7 +928,7 @@ public abstract class BaseLoanIntegrationTest extends IntegrationTest {
                 Double outstandingPenaltyExpected = installments[i].outstandingAmounts != null
                         ? installments[i].outstandingAmounts.penaltyOutstanding
                         : null;
-                Double outstandingPenalty = period.getPenaltyChargesOutstanding();
+                Double outstandingPenalty = Utils.getDoubleValue(period.getPenaltyChargesOutstanding());
                 if (outstandingPenaltyExpected != null) {
                     Assertions.assertEquals(outstandingPenaltyExpected, outstandingPenalty,
                             "%d. installment's outstanding penalty is different, expected: %.2f, actual: %.2f".formatted(i,
@@ -923,7 +938,7 @@ public abstract class BaseLoanIntegrationTest extends IntegrationTest {
                 Double outstandingTotalExpected = installments[i].outstandingAmounts != null
                         ? installments[i].outstandingAmounts.totalOutstanding
                         : null;
-                Double outstandingTotal = period.getTotalOutstandingForPeriod();
+                Double outstandingTotal = Utils.getDoubleValue(period.getTotalOutstandingForPeriod());
                 if (outstandingTotalExpected != null) {
                     Assertions.assertEquals(outstandingTotalExpected, outstandingTotal,
                             "%d. installment's total outstanding is different, expected: %.2f, actual: %.2f".formatted(i,
@@ -931,7 +946,7 @@ public abstract class BaseLoanIntegrationTest extends IntegrationTest {
                 }
 
                 Double loanBalanceExpected = installments[i].loanBalance;
-                Double loanBalance = period.getPrincipalLoanBalanceOutstanding();
+                Double loanBalance = Utils.getDoubleValue(period.getPrincipalLoanBalanceOutstanding());
                 if (loanBalanceExpected != null) {
                     Assertions.assertEquals(loanBalanceExpected, loanBalance,
                             "%d. installment's loan balance is different, expected: %.2f, actual: %.2f".formatted(i, loanBalanceExpected,
@@ -1226,11 +1241,11 @@ public abstract class BaseLoanIntegrationTest extends IntegrationTest {
 
     protected void validateLoanSummaryBalances(GetLoansLoanIdResponse loanDetails, Double totalOutstanding, Double totalRepayment,
             Double principalOutstanding, Double principalPaid, Double totalOverpaid) {
-        assertEquals(totalOutstanding, loanDetails.getSummary().getTotalOutstanding());
-        assertEquals(totalRepayment, loanDetails.getSummary().getTotalRepayment());
-        assertEquals(principalOutstanding, loanDetails.getSummary().getPrincipalOutstanding());
-        assertEquals(principalPaid, loanDetails.getSummary().getPrincipalPaid());
-        assertEquals(totalOverpaid, loanDetails.getTotalOverpaid());
+        assertEquals(totalOutstanding, Utils.getDoubleValue(loanDetails.getSummary().getTotalOutstanding()));
+        assertEquals(totalRepayment, Utils.getDoubleValue(loanDetails.getSummary().getTotalRepayment()));
+        assertEquals(principalOutstanding, Utils.getDoubleValue(loanDetails.getSummary().getPrincipalOutstanding()));
+        assertEquals(principalPaid, Utils.getDoubleValue(loanDetails.getSummary().getPrincipalPaid()));
+        assertEquals(totalOverpaid, Utils.getDoubleValue(loanDetails.getTotalOverpaid()));
     }
 
     protected void checkMaturityDates(long loanId, LocalDate expectedMaturityDate, LocalDate actualMaturityDate) {
@@ -1257,6 +1272,42 @@ public abstract class BaseLoanIntegrationTest extends IntegrationTest {
     protected void rejectLoan(Long loanId, String rejectedOnDate) {
         loanTransactionHelper.rejectLoan(loanId,
                 new PostLoansLoanIdRequest().rejectedOnDate(rejectedOnDate).locale("en").dateFormat(DATETIME_PATTERN));
+    }
+
+    protected void verifyBusinessEvents(BusinessEvent... businessEvents) {
+        List<ExternalEventDTO> allExternalEvents = ExternalEventHelper.getAllExternalEvents(requestSpec, responseSpec);
+        logBusinessEvents(allExternalEvents);
+        Assertions.assertNotNull(businessEvents);
+        Assertions.assertNotNull(allExternalEvents);
+        Assertions.assertTrue(businessEvents.length <= allExternalEvents.size(),
+                "Expected business event count is less than actual. Expected: " + businessEvents.length + " Actual: "
+                        + allExternalEvents.size());
+        final DateTimeFormatter formatter = DateTimeFormatter.ofPattern(DATETIME_PATTERN, Locale.ENGLISH);
+        for (BusinessEvent businessEvent : businessEvents) {
+            long count = allExternalEvents.stream().filter(externalEvent -> businessEvent.verify(externalEvent, formatter)).count();
+            Assertions.assertEquals(1, count, "Expected business event not found " + businessEvent);
+        }
+    }
+
+    protected void logBusinessEvents(List<ExternalEventDTO> allExternalEvents) {
+        allExternalEvents.forEach(externalEventDTO -> {
+            Object amount = externalEventDTO.getPayLoad().get("amount");
+            Object outstandingLoanBalance = externalEventDTO.getPayLoad().get("outstandingLoanBalance");
+            Object principalPortion = externalEventDTO.getPayLoad().get("principalPortion");
+            Object interestPortion = externalEventDTO.getPayLoad().get("interestPortion");
+            Object feePortion = externalEventDTO.getPayLoad().get("feeChargesPortion");
+            Object penaltyPortion = externalEventDTO.getPayLoad().get("penaltyChargesPortion");
+            log.info("Event Received\n type:'{}'\n businessDate:'{}'", externalEventDTO.getType(), externalEventDTO.getBusinessDate());
+            log.info(
+                    "Values\n amount: {}\n outstandingLoanBalance: {}\n principalPortion: {}\n interestPortion: {}\n feePortion: {}\n penaltyPortion: {}",
+                    amount, outstandingLoanBalance, principalPortion, interestPortion, feePortion, penaltyPortion);
+        });
+    }
+
+    protected void deleteAllExternalEvents() {
+        ExternalEventHelper.deleteAllExternalEvents(requestSpec, createResponseSpecification(Matchers.is(204)));
+        List<ExternalEventDTO> allExternalEvents = ExternalEventHelper.getAllExternalEvents(requestSpec, responseSpec);
+        Assertions.assertEquals(0, allExternalEvents.size());
     }
 
     @RequiredArgsConstructor

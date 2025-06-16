@@ -21,10 +21,6 @@ package org.apache.fineract.portfolio.loanaccount.service;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
-import io.swagger.v3.oas.annotations.media.Content;
-import io.swagger.v3.oas.annotations.media.Schema;
-import io.swagger.v3.oas.annotations.responses.ApiResponse;
-import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.POST;
@@ -62,6 +58,7 @@ public class InternalProgressiveLoanApiResource implements InitializingBean {
     private final AdvancedPaymentScheduleTransactionProcessor advancedPaymentScheduleTransactionProcessor;
     private final ProgressiveLoanInterestScheduleModelParserService progressiveLoanInterestScheduleModelParserService;
     private final InterestScheduleModelRepositoryWrapper writePlatformService;
+    private final LoanTransactionService loanTransactionService;
 
     @Override
     @SuppressFBWarnings("SLF4J_SIGN_ONLY_FORMAT")
@@ -79,22 +76,18 @@ public class InternalProgressiveLoanApiResource implements InitializingBean {
     @Produces({ MediaType.APPLICATION_JSON })
     @Path("{loanId}/model")
     @Operation(summary = "Fetch ProgressiveLoanInterestScheduleModel", description = "DO NOT USE THIS IN PRODUCTION!")
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "OK", content = @Content(schema = @Schema(implementation = InternalProgressiveLoanApiResourceSwagger.ProgressiveLoanInterestScheduleModel.class))) })
-    public String fetchModel(@PathParam("loanId") @Parameter(description = "loanId") long loanId) {
+    public ProgressiveLoanInterestScheduleModel fetchModel(@PathParam("loanId") @Parameter(description = "loanId") long loanId) {
         Loan loan = loanRepository.findOneWithNotFoundDetection(loanId);
         if (!loan.isProgressiveSchedule()) {
             throw new IllegalArgumentException("The loan is not progressive.");
         }
 
-        return writePlatformService
-                .readProgressiveLoanInterestScheduleModel(loanId, loan.getLoanRepaymentScheduleDetail(),
-                        loan.getLoanProduct().getInstallmentAmountInMultiplesOf())
-                .map(progressiveLoanInterestScheduleModelParserService::toJson).orElse(null);
+        return writePlatformService.readProgressiveLoanInterestScheduleModel(loanId, loan.getLoanRepaymentScheduleDetail(),
+                loan.getLoanProductRelatedDetail().getInstallmentAmountInMultiplesOf()).orElse(null);
     }
 
     private ProgressiveLoanInterestScheduleModel reprocessTransactionsAndGetModel(final Loan loan) {
-        final List<LoanTransaction> transactionsToReprocess = loan.retrieveListOfTransactionsForReprocessing();
+        final List<LoanTransaction> transactionsToReprocess = loanTransactionService.retrieveListOfTransactionsForReprocessing(loan);
         final LocalDate businessDate = ThreadLocalContextUtil.getBusinessDate();
         final Pair<ChangedTransactionDetail, ProgressiveLoanInterestScheduleModel> changedTransactionDetailProgressiveLoanInterestScheduleModelPair = advancedPaymentScheduleTransactionProcessor
                 .reprocessProgressiveLoanTransactionsTransactional(loan.getDisbursementDate(), businessDate, transactionsToReprocess,
@@ -115,9 +108,7 @@ public class InternalProgressiveLoanApiResource implements InitializingBean {
     @Path("{loanId}/model")
     @Produces({ MediaType.APPLICATION_JSON })
     @Operation(summary = "Update and Save ProgressiveLoanInterestScheduleModel", description = "DO NOT USE THIS IN PRODUCTION!")
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "OK", content = @Content(schema = @Schema(implementation = InternalProgressiveLoanApiResourceSwagger.ProgressiveLoanInterestScheduleModel.class))) })
-    public String updateModel(@PathParam("loanId") @Parameter(description = "loanId") long loanId) {
+    public ProgressiveLoanInterestScheduleModel updateModel(@PathParam("loanId") @Parameter(description = "loanId") long loanId) {
         Loan loan = loanRepository.findOneWithNotFoundDetection(loanId);
         if (!loan.isProgressiveSchedule()) {
             throw new IllegalArgumentException("The loan is not progressive.");

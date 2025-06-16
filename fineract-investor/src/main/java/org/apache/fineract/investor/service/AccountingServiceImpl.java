@@ -44,7 +44,7 @@ import org.apache.fineract.organisation.office.domain.Office;
 import org.apache.fineract.portfolio.PortfolioProductType;
 import org.apache.fineract.portfolio.loanaccount.domain.Loan;
 import org.apache.fineract.portfolio.loanaccount.domain.LoanStatus;
-import org.jetbrains.annotations.NotNull;
+import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -55,6 +55,7 @@ public class AccountingServiceImpl implements AccountingService {
     private final ExternalAssetOwnerTransferJournalEntryMappingRepository externalAssetOwnerTransferJournalEntryMappingRepository;
     private final ExternalAssetOwnerJournalEntryMappingRepository externalAssetOwnerJournalEntryMappingRepository;
     private final FinancialActivityAccountRepositoryWrapper financialActivityAccountRepository;
+    private final ExternalAssetOwnerTransferOutstandingInterestCalculation externalAssetOwnerTransferOutstandingInterestCalculation;
 
     @Override
     public void createJournalEntriesForSaleAssetTransfer(final Loan loan, final ExternalAssetOwnerTransfer transfer,
@@ -96,7 +97,7 @@ public class AccountingServiceImpl implements AccountingService {
         });
     }
 
-    @NotNull
+    @NonNull
     private List<JournalEntry> createJournalEntries(final Loan loan, final ExternalAssetOwnerTransfer transfer,
             final boolean isReversalOrder) {
         this.helper.checkForBranchClosures(loan.getOffice().getId(), transfer.getSettlementDate());
@@ -104,7 +105,8 @@ public class AccountingServiceImpl implements AccountingService {
         final Long transactionId = transfer.getId();
         final LocalDate transactionDate = transfer.getSettlementDate();
         final BigDecimal principalAmount = loan.getSummary().getTotalPrincipalOutstanding();
-        final BigDecimal interestAmount = loan.getSummary().getTotalInterestOutstanding();
+        // We have different strategies to calculate oustanding interest
+        final BigDecimal interestAmount = externalAssetOwnerTransferOutstandingInterestCalculation.calculateOutstandingInterest(loan);
         final BigDecimal feesAmount = loan.getSummary().getTotalFeeChargesOutstanding();
         final BigDecimal penaltiesAmount = loan.getSummary().getTotalPenaltyChargesOutstanding();
         final BigDecimal overPaymentAmount = loan.getTotalOverpaid();
