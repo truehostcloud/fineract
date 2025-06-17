@@ -1,14 +1,15 @@
 name: Fineract Publish to DockerHub
+
 on:
   push:
     branches:
       - develop
     tags:
       - 1.*
-      
-            
+
 permissions:
   contents: read
+
 jobs:
   build:
     runs-on: ubuntu-24.04
@@ -27,7 +28,7 @@ jobs:
           distribution: 'zulu'
 
       - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@8379f6a1328ee0e06e2bb424dadb7b159856a326 # v4.4.0
+        uses: gradle/actions/setup-gradle@v4
 
       - name: Extract branch name
         shell: bash
@@ -41,14 +42,14 @@ jobs:
         id: git_hashes
 
       - name: Build the Apache Fineract image
-        run:  |
+        run: |
           TAGS=${{ steps.extract_branch.outputs.branch }}
           if [ "${{ steps.extract_branch.outputs.branch }}" == "develop" ]; then
             TAGS="$TAGS,${{ steps.git_hashes.outputs.short_hash }},${{ steps.git_hashes.outputs.long_hash }}"
           fi
           ./gradlew clean --no-daemon --console=plain :fineract-provider:jib -x test -x cucumber \
-            -Djib.to.auth.username=${{secrets.DOCKERHUB_USERNAME}} \
-            -Djib.to.auth.password=${{secrets.DOCKERHUB_PASSWORD}} \
+            -Djib.to.auth.username=${{ secrets.DOCKERHUB_USERNAME }} \
+            -Djib.to.auth.password=${{ secrets.DOCKERHUB_PASSWORD }} \
             -Djib.from.platforms=linux/amd64,linux/arm64 \
             -Djib.to.image=truehostcloud/fineract-base \
             -Djib.to.tags=$TAGS
