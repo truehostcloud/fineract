@@ -1153,7 +1153,11 @@ public class LoanChargeWritePlatformServiceImpl implements LoanChargeWritePlatfo
 
         if (feeFrequency == null) {
             if (appliedFrequencyNumbers.isEmpty()) {
-                LocalDate chargeDate = dueDate.plusDays(penaltyWaitPeriodValue + 1L - gracePeriodOffset);
+                LocalDate earliestPenaltyDate = dueDate.plusDays(penaltyWaitPeriodValue + 1L);
+                LocalDate chargeDate = earliestPenaltyDate.minusDays(gracePeriodOffset);
+                if (DateUtils.isBefore(chargeDate, earliestPenaltyDate)) {
+                    chargeDate = earliestPenaltyDate;
+                }
                 if (!DateUtils.isAfter(chargeDate, currentDate)) {
                     scheduleDates.put(1, chargeDate);
                 }
