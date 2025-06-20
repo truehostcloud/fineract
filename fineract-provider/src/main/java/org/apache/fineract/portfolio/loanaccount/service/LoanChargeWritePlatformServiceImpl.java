@@ -1163,7 +1163,6 @@ public class LoanChargeWritePlatformServiceImpl implements LoanChargeWritePlatfo
                 }
             }
         } else {
-            // Recurring penalty: apply for each period from grace period end until current date
             calculateRecurringPenaltyScheduleDates(scheduleDates, dueDate, currentDate, penaltyWaitPeriodValue, gracePeriodOffset,
                     feeFrequency, chargeDefinition, appliedFrequencyNumbers);
         }
@@ -1216,24 +1215,19 @@ public class LoanChargeWritePlatformServiceImpl implements LoanChargeWritePlatfo
         final PeriodFrequencyType frequencyType = PeriodFrequencyType.fromInt(feeFrequency);
         final Integer feeInterval = chargeDefinition.feeInterval();
 
-        // Calculate the earliest possible penalty date (after grace period)
         final LocalDate earliestPenaltyDate = dueDate.plusDays(penaltyWaitPeriodValue + 1L);
         LocalDate chargeStartDate = earliestPenaltyDate;
         LocalDate chargeDate = chargeStartDate.minusDays(gracePeriodOffset);
         int frequencyNumber = 1;
 
-        // Ensure charge date is never before the earliest penalty date
         if (DateUtils.isBefore(chargeDate, earliestPenaltyDate)) {
             chargeDate = earliestPenaltyDate;
         }
 
-        // Generate all applicable charge dates from grace period end until current date
         while (!DateUtils.isAfter(chargeDate, currentDate)) {
-            // Only add if this frequency hasn't been applied yet
             if (!appliedFrequencyNumbers.contains(frequencyNumber)) {
                 scheduleDates.put(frequencyNumber, chargeDate);
             }
-            // Calculate next charge date based on frequency
             chargeStartDate = scheduledDateGenerator.getRepaymentPeriodDate(frequencyType, feeInterval, chargeStartDate);
             chargeDate = chargeStartDate.minusDays(gracePeriodOffset);
             frequencyNumber++;
