@@ -1218,21 +1218,30 @@ public class LoanChargeWritePlatformServiceImpl implements LoanChargeWritePlatfo
         final LocalDate earliestPenaltyDate = dueDate.plusDays(penaltyWaitPeriodValue + 1L);
         LocalDate chargeStartDate = earliestPenaltyDate;
         LocalDate chargeDate = chargeStartDate.minusDays(gracePeriodOffset);
-        int frequencyNumber = 1;
-
         if (DateUtils.isBefore(chargeDate, earliestPenaltyDate)) {
             chargeDate = earliestPenaltyDate;
         }
 
-        while (!DateUtils.isAfter(chargeDate, currentDate)) {
+        int numPeriods = 0;
+        LocalDate tempDate = chargeDate;
+        while (!DateUtils.isAfter(tempDate, currentDate)) {
+            numPeriods++;
+            tempDate = scheduledDateGenerator.getRepaymentPeriodDate(frequencyType, feeInterval, tempDate.plusDays(gracePeriodOffset));
+            tempDate = tempDate.minusDays(gracePeriodOffset);
+        }
+
+        chargeStartDate = earliestPenaltyDate;
+        chargeDate = chargeStartDate.minusDays(gracePeriodOffset);
+        if (DateUtils.isBefore(chargeDate, earliestPenaltyDate)) {
+            chargeDate = earliestPenaltyDate;
+        }
+        for (int frequencyNumber = 1; frequencyNumber <= numPeriods; frequencyNumber++) {
             if (!appliedFrequencyNumbers.contains(frequencyNumber)) {
                 scheduleDates.put(frequencyNumber, chargeDate);
             }
             chargeStartDate = scheduledDateGenerator.getRepaymentPeriodDate(frequencyType, feeInterval, chargeStartDate);
             chargeDate = chargeStartDate.minusDays(gracePeriodOffset);
-            frequencyNumber++;
-            // Safety check to prevent infinite loops
-            if (frequencyNumber > 1000) {
+            if (DateUtils.isAfter(chargeDate, currentDate)) {
                 break;
             }
         }
