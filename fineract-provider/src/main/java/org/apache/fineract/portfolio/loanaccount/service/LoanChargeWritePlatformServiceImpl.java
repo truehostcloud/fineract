@@ -1139,34 +1139,32 @@ public class LoanChargeWritePlatformServiceImpl implements LoanChargeWritePlatfo
         boolean runInterestRecalculation = false;
         final Charge chargeDefinition = this.chargeRepository.findOneWithNotFoundDetection(loanChargeId);
 
-        Collection<Integer> frequencyNumbers = loanChargeReadPlatformService.retrieveOverdueInstallmentChargeFrequencyNumber(loan,
+        Collection<Integer> appliedFrequencyNumbers = loanChargeReadPlatformService.retrieveOverdueInstallmentChargeFrequencyNumber(loan,
                 chargeDefinition, periodNumber);
 
-        Integer feeFrequency = chargeDefinition.feeFrequency();
-        final ScheduledDateGenerator scheduledDateGenerator = new DefaultScheduledDateGenerator();
-        Map<Integer, LocalDate> scheduleDates = new HashMap<>();
         final Long penaltyWaitPeriodValue = this.configurationDomainService.retrievePenaltyWaitPeriod();
         final Long penaltyPostingWaitPeriodValue = this.configurationDomainService.retrieveGraceOnPenaltyPostingPeriod();
         final LocalDate dueDate = command.localDateValueOfParameterNamed("dueDate");
-        long diff = penaltyWaitPeriodValue + 1 - penaltyPostingWaitPeriodValue;
-        if (diff < 1) {
-            diff = 1L;
-        }
-        LocalDate startDate = dueDate.plusDays(penaltyWaitPeriodValue + 1L);
-        int frequencyNumber = 1;
+        final LocalDate currentDate = DateUtils.getBusinessLocalDate();
+        long gracePeriodOffset = Math.max(1L, penaltyWaitPeriodValue + 1 - penaltyPostingWaitPeriodValue);
+
+        Integer feeFrequency = chargeDefinition.feeFrequency();
+        Map<Integer, LocalDate> scheduleDates = new HashMap<>();
+
         if (feeFrequency == null) {
-            scheduleDates.put(frequencyNumber++, startDate.minusDays(diff));
-        } else {
-            while (!DateUtils.isDateInTheFuture(startDate)) {
-                scheduleDates.put(frequencyNumber++, startDate.minusDays(diff));
-
-                startDate = scheduledDateGenerator.getRepaymentPeriodDate(PeriodFrequencyType.fromInt(feeFrequency),
-                        chargeDefinition.feeInterval(), startDate);
+            if (appliedFrequencyNumbers.isEmpty()) {
+                LocalDate earliestPenaltyDate = dueDate.plusDays(penaltyWaitPeriodValue + 1L);
+                LocalDate chargeDate = earliestPenaltyDate.minusDays(gracePeriodOffset);
+                if (DateUtils.isBefore(chargeDate, earliestPenaltyDate)) {
+                    chargeDate = earliestPenaltyDate;
+                }
+                if (!DateUtils.isAfter(chargeDate, currentDate)) {
+                    scheduleDates.put(1, chargeDate);
+                }
             }
-        }
-
-        for (Integer frequency : frequencyNumbers) {
-            scheduleDates.remove(frequency);
+        } else {
+            calculateRecurringPenaltyScheduleDates(scheduleDates, dueDate, currentDate, penaltyWaitPeriodValue, gracePeriodOffset,
+                    feeFrequency, chargeDefinition, appliedFrequencyNumbers);
         }
 
         LoanRepaymentScheduleInstallment installment = null;
@@ -1177,8 +1175,10 @@ public class LoanChargeWritePlatformServiceImpl implements LoanChargeWritePlatfo
             lastChargeAppliedDate = installment.getDueDate();
             businessEventNotifierService.notifyPreBusinessEvent(new LoanApplyOverdueChargeBusinessEvent(loan));
 
-            for (Map.Entry<Integer, LocalDate> entry : scheduleDates.entrySet()) {
+            List<Map.Entry<Integer, LocalDate>> sortedScheduleDates = new ArrayList<>(scheduleDates.entrySet());
+            sortedScheduleDates.sort(Map.Entry.comparingByValue());
 
+            for (Map.Entry<Integer, LocalDate> entry : sortedScheduleDates) {
                 final LoanCharge loanCharge = loanChargeAssembler.createNewFromJson(loan, chargeDefinition, command, entry.getValue());
 
                 if (BigDecimal.ZERO.compareTo(loanCharge.amount()) == 0) {
@@ -1202,6 +1202,49 @@ public class LoanChargeWritePlatformServiceImpl implements LoanChargeWritePlatfo
         }
 
         return new LoanOverdueDTO(loan, runInterestRecalculation, recalculateFrom, lastChargeAppliedDate);
+    }
+
+    /**
+     * Helper method to calculate all recurring penalty schedule dates for overdue penalties. For each interval after
+     * the grace period, up to the current date, if not already applied, add to schedule.
+     */
+    private void calculateRecurringPenaltyScheduleDates(Map<Integer, LocalDate> scheduleDates, LocalDate dueDate, LocalDate currentDate,
+            long penaltyWaitPeriodValue, long gracePeriodOffset, Integer feeFrequency, Charge chargeDefinition,
+            Collection<Integer> appliedFrequencyNumbers) {
+        final ScheduledDateGenerator scheduledDateGenerator = new DefaultScheduledDateGenerator();
+        final PeriodFrequencyType frequencyType = PeriodFrequencyType.fromInt(feeFrequency);
+        final Integer feeInterval = chargeDefinition.feeInterval();
+
+        final LocalDate earliestPenaltyDate = dueDate.plusDays(penaltyWaitPeriodValue + 1L);
+        LocalDate chargeStartDate = earliestPenaltyDate;
+        LocalDate chargeDate = chargeStartDate.minusDays(gracePeriodOffset);
+        if (DateUtils.isBefore(chargeDate, earliestPenaltyDate)) {
+            chargeDate = earliestPenaltyDate;
+        }
+
+        int numPeriods = 0;
+        LocalDate tempDate = chargeDate;
+        while (!DateUtils.isAfter(tempDate, currentDate)) {
+            numPeriods++;
+            tempDate = scheduledDateGenerator.getRepaymentPeriodDate(frequencyType, feeInterval, tempDate.plusDays(gracePeriodOffset));
+            tempDate = tempDate.minusDays(gracePeriodOffset);
+        }
+
+        chargeStartDate = earliestPenaltyDate;
+        chargeDate = chargeStartDate.minusDays(gracePeriodOffset);
+        if (DateUtils.isBefore(chargeDate, earliestPenaltyDate)) {
+            chargeDate = earliestPenaltyDate;
+        }
+        for (int frequencyNumber = 1; frequencyNumber <= numPeriods; frequencyNumber++) {
+            if (!appliedFrequencyNumbers.contains(frequencyNumber)) {
+                scheduleDates.put(frequencyNumber, chargeDate);
+            }
+            chargeStartDate = scheduledDateGenerator.getRepaymentPeriodDate(frequencyType, feeInterval, chargeStartDate);
+            chargeDate = chargeStartDate.minusDays(gracePeriodOffset);
+            if (DateUtils.isAfter(chargeDate, currentDate)) {
+                break;
+            }
+        }
     }
 
     private void addInstallmentIfPenaltyAppliedAfterLastDueDate(Loan loan, LocalDate lastChargeDate) {
