@@ -232,7 +232,7 @@ public class LoanScheduleAssembler {
         Boolean allowPartialPeriodInterestCalcualtion = this.fromApiJsonHelper
                 .extractBooleanNamed(LoanProductConstants.ALLOW_PARTIAL_PERIOD_INTEREST_CALCUALTION_PARAM_NAME, element);
         if (allowPartialPeriodInterestCalcualtion == null) {
-            allowPartialPeriodInterestCalcualtion = loanProduct.getLoanProductRelatedDetail().isAllowPartialPeriodInterestCalcualtion();
+            allowPartialPeriodInterestCalcualtion = loanProduct.getLoanProductRelatedDetail().isAllowPartialPeriodInterestCalculation();
         }
 
         final BigDecimal interestRatePerPeriod = this.fromApiJsonHelper.extractBigDecimalWithLocaleNamed("interestRatePerPeriod", element);
@@ -550,7 +550,11 @@ public class LoanScheduleAssembler {
                 loanProduct.getLoanProductRelatedDetail().isEnableIncomeCapitalization(),
                 loanProduct.getLoanProductRelatedDetail().getCapitalizedIncomeCalculationType(),
                 loanProduct.getLoanProductRelatedDetail().getCapitalizedIncomeStrategy(),
-                loanProduct.getLoanProductRelatedDetail().getCapitalizedIncomeType());
+                loanProduct.getLoanProductRelatedDetail().getCapitalizedIncomeType(),
+                loanProduct.getLoanProductRelatedDetail().isEnableBuyDownFee(),
+                loanProduct.getLoanProductRelatedDetail().getBuyDownFeeCalculationType(),
+                loanProduct.getLoanProductRelatedDetail().getBuyDownFeeStrategy(),
+                loanProduct.getLoanProductRelatedDetail().getBuyDownFeeIncomeType());
     }
 
     private CalendarInstance createCalendarForSameAsRepayment(final Integer repaymentEvery,
@@ -1355,15 +1359,15 @@ public class LoanScheduleAssembler {
         }
 
         if (command.isChangeInBooleanParameterNamed(LoanProductConstants.ALLOW_PARTIAL_PERIOD_INTEREST_CALCUALTION_PARAM_NAME,
-                loanProductRelatedDetail.isAllowPartialPeriodInterestCalcualtion())) {
+                loanProductRelatedDetail.isAllowPartialPeriodInterestCalculation())) {
             final boolean newValue = command
                     .booleanPrimitiveValueOfParameterNamed(LoanProductConstants.ALLOW_PARTIAL_PERIOD_INTEREST_CALCUALTION_PARAM_NAME);
             changes.put(LoanProductConstants.ALLOW_PARTIAL_PERIOD_INTEREST_CALCUALTION_PARAM_NAME, newValue);
-            loanProductRelatedDetail.setAllowPartialPeriodInterestCalcualtion(newValue);
+            loanProductRelatedDetail.setAllowPartialPeriodInterestCalculation(newValue);
         }
 
         if (loanProductRelatedDetail.getInterestCalculationPeriodMethod().isDaily()) {
-            loanProductRelatedDetail.setAllowPartialPeriodInterestCalcualtion(false);
+            loanProductRelatedDetail.setAllowPartialPeriodInterestCalculation(false);
         }
 
         final String graceOnPrincipalPaymentParamName = "graceOnPrincipalPayment";
