@@ -31,8 +31,8 @@ import org.apache.fineract.infrastructure.documentmanagement.domain.StorageType;
 import org.apache.fineract.infrastructure.documentmanagement.exception.ContentManagementException;
 import org.apache.fineract.infrastructure.documentmanagement.exception.DocumentNotFoundException;
 import org.apache.fineract.infrastructure.documentmanagement.exception.InvalidEntityTypeForDocumentManagementException;
-import org.apache.fineract.infrastructure.event.business.domain.document.DocumentCreateBusinessEvent;
-import org.apache.fineract.infrastructure.event.business.domain.document.DocumentDeleteBusinessEvent;
+import org.apache.fineract.infrastructure.event.business.domain.document.DocumentCreatedBusinessEvent;
+import org.apache.fineract.infrastructure.event.business.domain.document.DocumentDeletedBusinessEvent;
 import org.apache.fineract.infrastructure.event.business.service.BusinessEventNotifierService;
 import org.apache.fineract.infrastructure.security.service.PlatformSecurityContext;
 import org.slf4j.Logger;
@@ -55,7 +55,7 @@ public class DocumentWritePlatformServiceJpaRepositoryImpl implements DocumentWr
 
     @Autowired
     public DocumentWritePlatformServiceJpaRepositoryImpl(final PlatformSecurityContext context, final DocumentRepository documentRepository,
-            final ContentRepositoryFactory documentStoreFactory, final BusinessEventNotifierService businessEventNotifierService) {
+            final ContentRepositoryFactory documentStoreFactory, BusinessEventNotifierService businessEventNotifierService) {
         this.context = context;
         this.documentRepository = documentRepository;
         this.contentRepositoryFactory = documentStoreFactory;
@@ -83,8 +83,7 @@ public class DocumentWritePlatformServiceJpaRepositoryImpl implements DocumentWr
                     documentCommand.getDescription(), fileLocation, contentRepository.getStorageType());
 
             this.documentRepository.saveAndFlush(document);
-
-            this.businessEventNotifierService.notifyPostBusinessEvent(new DocumentCreateBusinessEvent(document));
+            businessEventNotifierService.notifyPostBusinessEvent(new DocumentCreatedBusinessEvent(document));
 
             return document.getId();
         } catch (final JpaSystemException | DataIntegrityViolationException dve) {
@@ -162,10 +161,11 @@ public class DocumentWritePlatformServiceJpaRepositoryImpl implements DocumentWr
                 .orElseThrow(() -> new DocumentNotFoundException(documentCommand.getParentEntityType(), documentCommand.getParentEntityId(),
                         documentCommand.getId()));
         this.documentRepository.delete(document);
-        this.businessEventNotifierService.notifyPostBusinessEvent(new DocumentDeleteBusinessEvent(document));
+        this.businessEventNotifierService.notifyPostBusinessEvent(new DocumentDeletedBusinessEvent(document));
 
         final ContentRepository contentRepository = this.contentRepositoryFactory.getRepository(document.storageType());
         contentRepository.deleteFile(document.getLocation());
+        businessEventNotifierService.notifyPostBusinessEvent(new DocumentDeletedBusinessEvent(document));
         return CommandProcessingResult.resourceResult(document.getId());
     }
 

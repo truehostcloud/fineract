@@ -733,6 +733,16 @@ final class LoansApiResourceSwagger {
                 public boolean capitalizedIncomeAmortization;
                 @Schema(example = "false")
                 public boolean capitalizedIncomeAdjustment;
+                @Schema(example = "false")
+                public boolean contractTermination;
+                @Schema(example = "false")
+                public boolean buyDownFee;
+                @Schema(example = "false")
+                public boolean buyDownFeeAdjustment;
+                @Schema(example = "false")
+                public boolean buyDownFeeAmortization;
+                @Schema(example = "false")
+                public boolean buyDownFeeAmortizationAdjustment;
             }
 
             static final class GetLoansLoanIdPaymentDetailData {
@@ -1225,6 +1235,14 @@ final class LoansApiResourceSwagger {
         public StringEnumOptionData capitalizedIncomeStrategy;
         @Schema(example = "FEE")
         public StringEnumOptionData capitalizedIncomeType;
+        @Schema(example = "false")
+        public Boolean enableBuyDownFee;
+        @Schema(example = "FLAT")
+        public StringEnumOptionData buyDownFeeCalculationType;
+        @Schema(example = "EQUAL_AMORTIZATION")
+        public StringEnumOptionData buyDownFeeStrategy;
+        @Schema(example = "FEE")
+        public StringEnumOptionData buyDownFeeIncomeType;
     }
 
     @Schema(description = "GetLoansResponse")
@@ -1346,6 +1364,14 @@ final class LoansApiResourceSwagger {
         public String capitalizedIncomeStrategy;
         @Schema(example = "FEE")
         public StringEnumOptionData capitalizedIncomeType;
+        @Schema(example = "false")
+        public Boolean enableBuyDownFee;
+        @Schema(example = "FLAT", allowableValues = "FLAT")
+        public String buyDownFeeCalculationType;
+        @Schema(example = "EQUAL_AMORTIZATION", allowableValues = "EQUAL_AMORTIZATION")
+        public String buyDownFeeStrategy;
+        @Schema(example = "FEE", allowableValues = { "FEE", "INTEREST" })
+        public String buyDownFeeIncomeType;
         @Schema(example = "List of PostLoansDataTable")
         public List<PostLoansDataTable> datatables;
 
