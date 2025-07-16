@@ -320,7 +320,7 @@ public class SmsCampaignDomainServiceImpl implements SmsCampaignDomainService {
         smsParams.put("mobileNo", client.mobileNo());
         smsParams.put("LoanAmount", loan.getPrincipal());
         smsParams.put("LoanOutstanding", loanTransaction.getOutstandingLoanBalance());
-        smsParams.put("TotalLoanOutstanding", loan.getSummary().getTotalOutstanding(loan.getCurrency()));
+        smsParams.put("PayoffAmount", loan.getSummary().getTotalOutstanding(loan.getCurrency()));
         smsParams.put("loanId", loan.getId());
         smsParams.put("LoanAccountId", loan.getAccountNumber());
         smsParams.put("officeId", client.getOffice().getId());
