@@ -281,6 +281,10 @@ public class LoanSummary {
         return Money.of(currency, this.totalOutstanding);
     }
 
+    public BigDecimal getTotalOutstandingAmount() {
+        return this.totalOutstanding;
+    }
+
     public void updateFeeChargeOutstanding(final BigDecimal totalFeeChargesOutstanding) {
         this.totalFeeChargesOutstanding = totalFeeChargesOutstanding;
     }
