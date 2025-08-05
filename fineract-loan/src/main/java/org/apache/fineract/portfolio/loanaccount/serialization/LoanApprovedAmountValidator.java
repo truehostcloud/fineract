@@ -16,21 +16,11 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.fineract.cob.data;
+package org.apache.fineract.portfolio.loanaccount.serialization;
 
-import com.fasterxml.jackson.annotation.JsonTypeInfo;
-import lombok.AllArgsConstructor;
-import lombok.EqualsAndHashCode;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
+import org.apache.fineract.infrastructure.core.api.JsonCommand;
 
-@AllArgsConstructor
-@Getter
-@NoArgsConstructor
-@JsonTypeInfo(use = JsonTypeInfo.Id.CLASS)
-@EqualsAndHashCode
-public class LoanCOBParameter {
+public interface LoanApprovedAmountValidator {
 
-    private Long minLoanId;
-    private Long maxLoanId;
+    void validateLoanApprovedAmountModification(JsonCommand command);
 }

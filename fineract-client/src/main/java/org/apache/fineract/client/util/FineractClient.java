@@ -85,9 +85,11 @@ import org.apache.fineract.client.services.InterestRateSlabAKAInterestBandsApi;
 import org.apache.fineract.client.services.JournalEntriesApi;
 import org.apache.fineract.client.services.ListReportMailingJobHistoryApi;
 import org.apache.fineract.client.services.LoanAccountLockApi;
+import org.apache.fineract.client.services.LoanBuyDownFeesApi;
 import org.apache.fineract.client.services.LoanChargesApi;
 import org.apache.fineract.client.services.LoanCobCatchUpApi;
 import org.apache.fineract.client.services.LoanCollateralApi;
+import org.apache.fineract.client.services.LoanDeferredIncomeDataApi;
 import org.apache.fineract.client.services.LoanDisbursementDetailsApi;
 import org.apache.fineract.client.services.LoanInterestPauseApi;
 import org.apache.fineract.client.services.LoanProductsApi;
@@ -230,6 +232,7 @@ public final class FineractClient {
     public final LoanChargesApi loanCharges;
     public final LoanCobCatchUpApi loanCobCatchUpApi;
     public final LoanCollateralApi loanCollaterals;
+    public final LoanDeferredIncomeDataApi loanDeferredIncome;
     public final LoanProductsApi loanProducts;
     public final LoanReschedulingApi loanSchedules;
     public final LoansPointInTimeApi loansPointInTimeApi;
@@ -302,6 +305,7 @@ public final class FineractClient {
     public final ExternalAssetOwnerLoanProductAttributesApi externalAssetOwnerLoanProductAttributes;
     public final LoanAccountLockApi loanAccountLockApi;
     public final InlineJobApi inlineJobApi;
+    public final LoanBuyDownFeesApi loanBuyDownFeesApi;
 
     private FineractClient(OkHttpClient okHttpClient, Retrofit retrofit) {
         this.okHttpClient = okHttpClient;
@@ -359,6 +363,7 @@ public final class FineractClient {
         loanCharges = retrofit.create(LoanChargesApi.class);
         loanCobCatchUpApi = retrofit.create(LoanCobCatchUpApi.class);
         loanCollaterals = retrofit.create(LoanCollateralApi.class);
+        loanDeferredIncome = retrofit.create(LoanDeferredIncomeDataApi.class);
         loanProducts = retrofit.create(LoanProductsApi.class);
         loanSchedules = retrofit.create(LoanReschedulingApi.class);
         loansPointInTimeApi = retrofit.create(LoansPointInTimeApi.class);
@@ -427,6 +432,7 @@ public final class FineractClient {
         loanInterestPauseApi = retrofit.create(LoanInterestPauseApi.class);
         progressiveLoanApi = retrofit.create(ProgressiveLoanApi.class);
         inlineJobApi = retrofit.create(InlineJobApi.class);
+        loanBuyDownFeesApi = retrofit.create(LoanBuyDownFeesApi.class);
     }
 
     public static Builder builder() {

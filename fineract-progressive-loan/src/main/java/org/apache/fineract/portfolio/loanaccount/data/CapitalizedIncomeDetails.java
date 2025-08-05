@@ -16,13 +16,23 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.fineract.cob.data;
+package org.apache.fineract.portfolio.loanaccount.data;
 
-import java.time.LocalDate;
+import java.math.BigDecimal;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+import lombok.Setter;
+import lombok.ToString;
 
-public interface LoanIdAndLastClosedBusinessDate {
+@AllArgsConstructor
+@ToString
+@Getter
+@Setter
+public class CapitalizedIncomeDetails {
 
-    Long getId();
-
-    LocalDate getLastClosedBusinessDate();
+    private BigDecimal amount;
+    private BigDecimal amortizedAmount;
+    private BigDecimal unrecognizedAmount;
+    private BigDecimal amountAdjustment;
+    private BigDecimal chargedOffAmount;
 }

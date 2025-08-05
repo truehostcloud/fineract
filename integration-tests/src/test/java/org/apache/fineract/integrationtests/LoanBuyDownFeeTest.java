@@ -19,7 +19,9 @@
 package org.apache.fineract.integrationtests;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.math.BigDecimal;
@@ -30,6 +32,7 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.fineract.client.models.BuyDownFeeAmortizationDetails;
 import org.apache.fineract.client.models.GetLoansLoanIdResponse;
 import org.apache.fineract.client.models.GetLoansLoanIdTransactions;
 import org.apache.fineract.client.models.PostClientsResponse;
@@ -39,6 +42,7 @@ import org.apache.fineract.client.models.PostLoansLoanIdTransactionsRequest;
 import org.apache.fineract.client.models.PostLoansLoanIdTransactionsResponse;
 import org.apache.fineract.client.models.PostLoansLoanIdTransactionsTransactionIdRequest;
 import org.apache.fineract.client.models.PostLoansResponse;
+import org.apache.fineract.client.util.CallFailedRuntimeException;
 import org.apache.fineract.integrationtests.common.BusinessStepHelper;
 import org.apache.fineract.integrationtests.common.ClientHelper;
 import org.apache.fineract.integrationtests.common.Utils;
@@ -573,4 +577,134 @@ public class LoanBuyDownFeeTest extends BaseLoanIntegrationTest {
                     journalEntry(4.87, feeIncomeAccount, "DEBIT"));
         });
     }
+
+    @Test
+    public void testRetrieveBuyDownFeeAmortizationDetails() {
+        final PostClientsResponse client = clientHelper.createClient(ClientHelper.defaultClientCreationRequest());
+        final PostLoanProductsResponse loanProduct = loanProductHelper.createLoanProduct(createProgressiveLoanProductWithBuyDownFee());
+
+        final long loanId = applyAndApproveProgressiveLoan(client.getClientId(), loanProduct.getResourceId(), "1 February 2024", 1000.0,
+                7.0, 6, null);
+
+        disburseLoan(loanId, BigDecimal.valueOf(1000), "1 February 2024");
+
+        addBuyDownFeeForLoan(loanId, 100.0, "1 February 2024");
+
+        final List<BuyDownFeeAmortizationDetails> amortizationDetails = loanTransactionHelper.fetchBuyDownFeeAmortizationDetails(loanId);
+
+        assertNotNull(amortizationDetails);
+        assertFalse(amortizationDetails.isEmpty());
+
+        final BuyDownFeeAmortizationDetails amortizationDetail = amortizationDetails.getFirst();
+        assertNotNull(amortizationDetail);
+        assertNotNull(amortizationDetail.getId());
+        assertEquals(loanId, amortizationDetail.getLoanId());
+        assertNotNull(amortizationDetail.getTransactionId());
+        assertEquals(LocalDate.of(2024, 2, 1), amortizationDetail.getBuyDownFeeDate());
+        assertNotNull(amortizationDetail.getBuyDownFeeAmount());
+        assertEquals(0, BigDecimal.valueOf(100.0).compareTo(amortizationDetail.getBuyDownFeeAmount()));
+        assertNotNull(amortizationDetail.getAmortizedAmount());
+        assertEquals(0, amortizationDetail.getAmortizedAmount().signum());
+        assertNotNull(amortizationDetail.getNotYetAmortizedAmount());
+        assertEquals(0, BigDecimal.valueOf(100.0).compareTo(amortizationDetail.getNotYetAmortizedAmount()));
+    }
+
+    @Test
+    public void testRetrieveBuyDownFeeAmortizationDetails_notEnabled() {
+        final PostClientsResponse client = clientHelper.createClient(ClientHelper.defaultClientCreationRequest());
+        final PostLoanProductsResponse loanProduct = loanProductHelper
+                .createLoanProduct(createProgressiveLoanProductWithBuyDownFee().enableBuyDownFee(false));
+
+        final long loanId = applyAndApproveProgressiveLoan(client.getClientId(), loanProduct.getResourceId(), "1 February 2024", 1000.0,
+                7.0, 6, null);
+
+        disburseLoan(loanId, BigDecimal.valueOf(1000), "1 February 2024");
+
+        final CallFailedRuntimeException exception = assertThrows(CallFailedRuntimeException.class, () -> {
+            addBuyDownFeeForLoan(loanId, 100.0, "1 February 2024");
+        });
+
+        assertEquals(400, exception.getResponse().code());
+        assertTrue(exception.getMessage().contains("buy.down.fee.not.enabled"));
+        assertTrue(exception.getMessage().contains("Buy down fee is not enabled for this loan product"));
+    }
+
+    @Test
+    public void testReverseBuyDownFeeTransaction() {
+        final AtomicReference<Long> buyDownFeeTransactionIdIdRef = new AtomicReference<>();
+
+        runAt("10 September 2024", () -> {
+            // Add initial buy down fee
+            final Long buyDownFeeTransactionId = addBuyDownFeeForLoan(loanId, 400.0, "10 September 2024");
+            assertNotNull(buyDownFeeTransactionId);
+            buyDownFeeTransactionIdIdRef.set(buyDownFeeTransactionId);
+
+            // Verify initial buy down fee accounting entries
+            verifyTRJournalEntries(buyDownFeeTransactionId, debit(buyDownExpenseAccount, 400.0),
+                    credit(deferredIncomeLiabilityAccount, 400.0));
+
+            verifyTransactions(loanId, //
+                    transaction(1000.0, "Disbursement", "01 September 2024"), //
+                    transaction(400.0, "Buy Down Fee", "10 September 2024"));
+        });
+
+        runAt("23 September 2024", () -> {
+            final Long buyDownFeeTransactionId = buyDownFeeTransactionIdIdRef.get();
+            executeInlineCOB(loanId);
+            // Reverse Buy Down Fee
+            PostLoansLoanIdTransactionsResponse transactionsResponse = loanTransactionHelper.reverseLoanTransaction(loanId,
+                    buyDownFeeTransactionId, new PostLoansLoanIdTransactionsTransactionIdRequest().dateFormat(DATETIME_PATTERN)
+                            .transactionDate("10 September 2024").note("Buy Down Fee reversed").transactionAmount(0.0).locale("en"));
+            Assertions.assertNotNull(transactionsResponse);
+            Assertions.assertNotNull(transactionsResponse.getResourceId());
+            Assertions.assertEquals(transactionsResponse.getResourceId(), buyDownFeeTransactionId);
+
+            // Verify initial buy down fee reversed accounting entries
+            verifyTRJournalEntries(buyDownFeeTransactionId, debit(buyDownExpenseAccount, 400.0),
+                    credit(deferredIncomeLiabilityAccount, 400.0), credit(buyDownExpenseAccount, 400.0),
+                    debit(deferredIncomeLiabilityAccount, 400.0));
+
+            verifyTransactions(loanId, //
+                    transaction(1000.0, "Disbursement", "01 September 2024"), //
+                    reversedTransaction(400.0, "Buy Down Fee", "10 September 2024"), //
+                    transaction(5.83, "Accrual", "22 September 2024"));
+        });
+    }
+
+    @Test
+    public void testTryToReverseBuyDownFeeTransactionWithBuyDownFeeAdjustment() {
+        final AtomicReference<Long> buyDownFeeTransactionIdIdRef = new AtomicReference<>();
+
+        runAt("10 September 2024", () -> {
+            // Add initial buy down fee
+            final Long buyDownFeeTransactionId = addBuyDownFeeForLoan(loanId, 400.0, "10 September 2024");
+            assertNotNull(buyDownFeeTransactionId);
+            buyDownFeeTransactionIdIdRef.set(buyDownFeeTransactionId);
+
+            // Verify initial buy down fee accounting entries
+            verifyTRJournalEntries(buyDownFeeTransactionId, debit(buyDownExpenseAccount, 400.0),
+                    credit(deferredIncomeLiabilityAccount, 400.0));
+
+            verifyTransactions(loanId, //
+                    transaction(1000.0, "Disbursement", "01 September 2024"), //
+                    transaction(400.0, "Buy Down Fee", "10 September 2024"));
+        });
+
+        runAt("23 September 2024", () -> {
+            final Long buyDownFeeTransactionId = buyDownFeeTransactionIdIdRef.get();
+            executeInlineCOB(loanId);
+
+            loanTransactionHelper.buyDownFeeAdjustment(loanId, buyDownFeeTransactionId, "23 September 2024", 200.0);
+
+            // Try to Reverse Buy Down Fee that has linked a Buy Down Fee Adjustment
+            CallFailedRuntimeException exception = assertThrows(CallFailedRuntimeException.class,
+                    () -> loanTransactionHelper.reverseLoanTransaction(loanId, buyDownFeeTransactionId,
+                            new PostLoansLoanIdTransactionsTransactionIdRequest().dateFormat(DATETIME_PATTERN)
+                                    .transactionDate("10 September 2024").note("Buy Down Fee reversed").transactionAmount(0.0)
+                                    .locale("en")));
+            assertEquals(403, exception.getResponse().code());
+            assertTrue(exception.getMessage().contains("loan.transaction.with.not.reversed.transaction.related"));
+        });
+    }
+
 }

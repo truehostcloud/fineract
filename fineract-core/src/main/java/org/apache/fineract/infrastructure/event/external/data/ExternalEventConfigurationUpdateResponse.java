@@ -16,11 +16,19 @@
  * specific language governing permissions and limitations
  * under the License.
  */
+<<<<<<<< HEAD:fineract-core/src/main/java/org/apache/fineract/infrastructure/cache/data/CacheSwitchRequest.java
+package org.apache.fineract.infrastructure.cache.data;
+========
 package org.apache.fineract.infrastructure.event.external.data;
+>>>>>>>> upstream/develop:fineract-core/src/main/java/org/apache/fineract/infrastructure/event/external/data/ExternalEventConfigurationUpdateResponse.java
 
+import jakarta.validation.constraints.NotNull;
 import java.io.Serial;
 import java.io.Serializable;
+<<<<<<<< HEAD:fineract-core/src/main/java/org/apache/fineract/infrastructure/cache/data/CacheSwitchRequest.java
+========
 import java.util.HashMap;
+>>>>>>>> upstream/develop:fineract-core/src/main/java/org/apache/fineract/infrastructure/event/external/data/ExternalEventConfigurationUpdateResponse.java
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -30,10 +38,19 @@ import lombok.NoArgsConstructor;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
+<<<<<<<< HEAD:fineract-core/src/main/java/org/apache/fineract/infrastructure/cache/data/CacheSwitchRequest.java
+public class CacheSwitchRequest implements Serializable {
+========
 public class ExternalEventConfigurationUpdateResponse implements Serializable {
+>>>>>>>> upstream/develop:fineract-core/src/main/java/org/apache/fineract/infrastructure/event/external/data/ExternalEventConfigurationUpdateResponse.java
 
     @Serial
     private static final long serialVersionUID = 1L;
 
+<<<<<<<< HEAD:fineract-core/src/main/java/org/apache/fineract/infrastructure/cache/data/CacheSwitchRequest.java
+    @NotNull(message = "{org.apache.fineract.cache.cache-type.not-null}")
+    private Integer cacheType;
+========
     private HashMap<String, Object> changes;
+>>>>>>>> upstream/develop:fineract-core/src/main/java/org/apache/fineract/infrastructure/event/external/data/ExternalEventConfigurationUpdateResponse.java
 }

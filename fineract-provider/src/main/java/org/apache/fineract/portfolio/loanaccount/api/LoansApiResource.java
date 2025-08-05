@@ -127,12 +127,14 @@ import org.apache.fineract.portfolio.loanaccount.data.DisbursementData;
 import org.apache.fineract.portfolio.loanaccount.data.GlimRepaymentTemplate;
 import org.apache.fineract.portfolio.loanaccount.data.LoanAccountData;
 import org.apache.fineract.portfolio.loanaccount.data.LoanApprovalData;
+import org.apache.fineract.portfolio.loanaccount.data.LoanApprovedAmountHistoryData;
 import org.apache.fineract.portfolio.loanaccount.data.LoanChargeData;
 import org.apache.fineract.portfolio.loanaccount.data.LoanCollateralManagementData;
 import org.apache.fineract.portfolio.loanaccount.data.LoanTermVariationsData;
 import org.apache.fineract.portfolio.loanaccount.data.LoanTransactionData;
 import org.apache.fineract.portfolio.loanaccount.data.PaidInAdvanceData;
 import org.apache.fineract.portfolio.loanaccount.data.RepaymentScheduleRelatedLoanData;
+import org.apache.fineract.portfolio.loanaccount.domain.LoanApprovedAmountHistoryRepository;
 import org.apache.fineract.portfolio.loanaccount.domain.LoanBuyDownFeeCalculationType;
 import org.apache.fineract.portfolio.loanaccount.domain.LoanBuyDownFeeIncomeType;
 import org.apache.fineract.portfolio.loanaccount.domain.LoanBuyDownFeeStrategy;
@@ -143,7 +145,6 @@ import org.apache.fineract.portfolio.loanaccount.domain.LoanStatus;
 import org.apache.fineract.portfolio.loanaccount.domain.LoanSummaryBalancesRepository;
 import org.apache.fineract.portfolio.loanaccount.domain.LoanTermVariationType;
 import org.apache.fineract.portfolio.loanaccount.domain.LoanTransactionRepaymentPeriodData;
-import org.apache.fineract.portfolio.loanaccount.exception.LoanNotFoundException;
 import org.apache.fineract.portfolio.loanaccount.exception.LoanTemplateTypeRequiredException;
 import org.apache.fineract.portfolio.loanaccount.exception.NotSupportedLoanTemplateTypeException;
 import org.apache.fineract.portfolio.loanaccount.guarantor.data.GuarantorData;
@@ -176,6 +177,8 @@ import org.apache.fineract.portfolio.savings.DepositAccountType;
 import org.apache.fineract.portfolio.savings.domain.SavingsAccountStatusType;
 import org.glassfish.jersey.media.multipart.FormDataContentDisposition;
 import org.glassfish.jersey.media.multipart.FormDataParam;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Component;
 import org.springframework.util.CollectionUtils;
 
@@ -303,6 +306,7 @@ public class LoansApiResource {
     private final LoanTermVariationsRepository loanTermVariationsRepository;
     private final LoanSummaryProviderDelegate loanSummaryProviderDelegate;
     private final LoanCapitalizedIncomeBalanceRepository loanCapitalizedIncomeBalanceRepository;
+    private final LoanApprovedAmountHistoryRepository loanApprovedAmountHistoryRepository;
 
     /*
      * This template API is used for loan approval, ideally this should be invoked on loan that are pending for
@@ -555,7 +559,6 @@ public class LoansApiResource {
         final CommandWrapper commandRequest = new CommandWrapperBuilder().createLoanApplication().withJson(apiRequestBodyAsJson).build();
 
         final CommandProcessingResult result = this.commandsSourceWritePlatformService.logCommandSource(commandRequest);
-
         return this.toApiJsonSerializer.serialize(result);
     }
 
@@ -872,12 +875,61 @@ public class LoansApiResource {
         return createLoanDelinquencyAction(null, ExternalIdFactory.produce(loanExternalId), apiRequestBodyAsJson);
     }
 
+    @PUT
+    @Path("{loanId}/approved-amount")
+    @Consumes(MediaType.APPLICATION_JSON)
+    @Produces(MediaType.APPLICATION_JSON)
+    @Operation(summary = "Modifies the approved amount of the loan", description = "")
+    @RequestBody(required = true, content = @Content(schema = @Schema(implementation = LoansApiResourceSwagger.PutLoansApprovedAmountRequest.class)))
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "OK", content = @Content(schema = @Schema(implementation = LoansApiResourceSwagger.PutLoansApprovedAmountResponse.class))) })
+    public CommandProcessingResult modifyLoanApprovedAmount(
+            @PathParam("loanId") @Parameter(description = "loanId", required = true) final Long loanId, @Context final UriInfo uriInfo,
+            @Parameter(hidden = true) final String apiRequestBodyAsJson) {
+        return modifyLoanApprovedAmount(loanId, ExternalId.empty(), apiRequestBodyAsJson);
+    }
+
+    @PUT
+    @Path("external-id/{loanExternalId}/approved-amount")
+    @Consumes(MediaType.APPLICATION_JSON)
+    @Produces(MediaType.APPLICATION_JSON)
+    @Operation(summary = "Modifies the approved amount of the loan", description = "")
+    @RequestBody(required = true, content = @Content(schema = @Schema(implementation = LoansApiResourceSwagger.PutLoansApprovedAmountRequest.class)))
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "OK", content = @Content(schema = @Schema(implementation = LoansApiResourceSwagger.PutLoansApprovedAmountResponse.class))) })
+    public CommandProcessingResult modifyLoanApprovedAmount(
+            @PathParam("loanExternalId") @Parameter(description = "loanExternalId", required = true) final String loanExternalId,
+            @Context final UriInfo uriInfo, @Parameter(hidden = true) final String apiRequestBodyAsJson) {
+        return modifyLoanApprovedAmount(null, ExternalIdFactory.produce(loanExternalId), apiRequestBodyAsJson);
+    }
+
+    @GET
+    @Path("{loanId}/approved-amount")
+    @Consumes(MediaType.APPLICATION_JSON)
+    @Produces(MediaType.APPLICATION_JSON)
+    @Operation(summary = "Collects and returns the approved amount modification history for a given loan", description = "")
+    public List<LoanApprovedAmountHistoryData> getLoanApprovedAmountHistory(
+            @PathParam("loanId") @Parameter(description = "loanId", required = true) final Long loanId, @Context final UriInfo uriInfo) {
+        return getLoanApprovedAmountHistory(loanId, ExternalId.empty());
+    }
+
+    @GET
+    @Path("external-id/{loanExternalId}/approved-amount")
+    @Consumes(MediaType.APPLICATION_JSON)
+    @Produces(MediaType.APPLICATION_JSON)
+    @Operation(summary = "Collects and returns the approved amount modification history for a given loan", description = "")
+    public List<LoanApprovedAmountHistoryData> getLoanApprovedAmountHistory(
+            @PathParam("loanExternalId") @Parameter(description = "loanExternalId", required = true) final String loanExternalId,
+            @Context final UriInfo uriInfo) {
+        return getLoanApprovedAmountHistory(null, ExternalIdFactory.produce(loanExternalId));
+    }
+
     private String retrieveApprovalTemplate(final Long loanId, final String loanExternalIdStr, final String templateType,
             final UriInfo uriInfo) {
         this.context.authenticatedUser().validateHasReadPermission(RESOURCE_NAME_FOR_PERMISSIONS);
         LoanApprovalData loanApprovalTemplate = null;
         ExternalId loanExternalId = ExternalIdFactory.produce(loanExternalIdStr);
-        Long resolvedLoanId = getResolvedLoanId(loanId, loanExternalId);
+        Long resolvedLoanId = loanId == null ? loanReadPlatformService.getResolvedLoanId(loanExternalId) : loanId;
         if (templateType == null) {
             final String errorMsg = "Loan template type must be provided";
             throw new LoanTemplateTypeRequiredException(errorMsg);
@@ -893,7 +945,7 @@ public class LoansApiResource {
             final UriInfo uriInfo) {
         this.context.authenticatedUser().validateHasReadPermission(RESOURCE_NAME_FOR_PERMISSIONS);
         ExternalId loanExternalId = ExternalIdFactory.produce(loanExternalIdStr);
-        Long resolvedLoanId = getResolvedLoanId(loanId, loanExternalId);
+        Long resolvedLoanId = loanId == null ? loanReadPlatformService.getResolvedLoanId(loanExternalId) : loanId;
         LoanAccountData loanBasicDetails = this.loanReadPlatformService.retrieveOne(resolvedLoanId);
         if (loanBasicDetails.isInterestRecalculationEnabled()) {
             Collection<CalendarData> interestRecalculationCalendarDatas = this.calendarReadPlatformService.retrieveCalendarsByEntity(
@@ -1187,7 +1239,7 @@ public class LoansApiResource {
         final CommandWrapperBuilder builder = new CommandWrapperBuilder().withJson(apiRequestBodyAsJson);
         CommandWrapper commandRequest;
         ExternalId loanExternalId = ExternalIdFactory.produce(loanExternalIdStr);
-        Long resolvedLoanId = getResolvedLoanId(loanId, loanExternalId);
+        Long resolvedLoanId = loanId == null ? loanReadPlatformService.getResolvedLoanId(loanExternalId) : loanId;
         if (CommandParameterUtil.is(commandParam, LoanApiConstants.MARK_AS_FRAUD_COMMAND)) {
             commandRequest = builder.markAsFraud(resolvedLoanId).build();
         } else {
@@ -1195,12 +1247,13 @@ public class LoansApiResource {
         }
 
         final CommandProcessingResult result = this.commandsSourceWritePlatformService.logCommandSource(commandRequest);
+
         return this.toApiJsonSerializer.serialize(result);
     }
 
     private String deleteLoanApplication(final Long loanId, final String loanExternalIdStr) {
         ExternalId loanExternalId = ExternalIdFactory.produce(loanExternalIdStr);
-        Long resolvedLoanId = getResolvedLoanId(loanId, loanExternalId);
+        Long resolvedLoanId = loanId == null ? loanReadPlatformService.getResolvedLoanId(loanExternalId) : loanId;
         final CommandWrapper commandRequest = new CommandWrapperBuilder().deleteLoanApplication(resolvedLoanId).build();
         final CommandProcessingResult result = this.commandsSourceWritePlatformService.logCommandSource(commandRequest);
         return this.toApiJsonSerializer.serialize(result);
@@ -1209,7 +1262,7 @@ public class LoansApiResource {
     private String stateTransitions(final Long loanId, final String loanExternalIdStr, final String commandParam,
             final String apiRequestBodyAsJson) {
         ExternalId loanExternalId = ExternalIdFactory.produce(loanExternalIdStr);
-        Long resolvedLoanId = getResolvedLoanId(loanId, loanExternalId);
+        Long resolvedLoanId = loanId == null ? loanReadPlatformService.getResolvedLoanId(loanExternalId) : loanId;
         final CommandWrapperBuilder builder = new CommandWrapperBuilder().withJson(apiRequestBodyAsJson);
         CommandWrapper commandRequest = null;
         if (CommandParameterUtil.is(commandParam, "reject")) {
@@ -1255,28 +1308,16 @@ public class LoansApiResource {
     private String getDelinquencyTagHistory(final Long loanId, final String loanExternalIdStr, final UriInfo uriInfo) {
         context.authenticatedUser().validateHasReadPermission("DELINQUENCY_TAGS");
         ExternalId loanExternalId = ExternalIdFactory.produce(loanExternalIdStr);
-        Long resolvedLoanId = getResolvedLoanId(loanId, loanExternalId);
+        Long resolvedLoanId = loanId == null ? loanReadPlatformService.getResolvedLoanId(loanExternalId) : loanId;
         final Collection<LoanDelinquencyTagHistoryData> loanDelinquencyTagHistoryData = this.delinquencyReadPlatformService
                 .retrieveDelinquencyRangeHistory(resolvedLoanId);
         return this.jsonSerializerTagHistory.serialize(loanDelinquencyTagHistoryData);
     }
 
-    private Long getResolvedLoanId(final Long loanId, final ExternalId loanExternalId) {
-        Long resolvedLoanId = loanId;
-        if (resolvedLoanId == null) {
-            loanExternalId.throwExceptionIfEmpty();
-            resolvedLoanId = this.loanReadPlatformService.retrieveLoanIdByExternalId(loanExternalId);
-            if (resolvedLoanId == null) {
-                throw new LoanNotFoundException(loanExternalId);
-            }
-        }
-        return resolvedLoanId;
-    }
-
     private String getLoanDelinquencyActions(final Long loanId, final String loanExternalIdStr, final UriInfo uriInfo) {
         context.authenticatedUser().validateHasReadPermission(RESOURCE_NAME_FOR_PERMISSIONS);
         ExternalId loanExternalId = ExternalIdFactory.produce(loanExternalIdStr);
-        Long resolvedLoanId = getResolvedLoanId(loanId, loanExternalId);
+        Long resolvedLoanId = loanId == null ? loanReadPlatformService.getResolvedLoanId(loanExternalId) : loanId;
 
         final Collection<LoanDelinquencyAction> delinquencyActions = this.delinquencyReadPlatformService
                 .retrieveLoanDelinquencyActions(resolvedLoanId);
@@ -1286,12 +1327,27 @@ public class LoansApiResource {
 
     private String createLoanDelinquencyAction(Long loanId, ExternalId loanExternalId, String apiRequestBodyAsJson) {
         context.authenticatedUser().validateHasCreatePermission(RESOURCE_NAME_FOR_DELINQUENCY_ACTION_PERMISSIONS);
-        Long resolvedLoanId = getResolvedLoanId(loanId, loanExternalId);
+        Long resolvedLoanId = loanId == null ? loanReadPlatformService.getResolvedLoanId(loanExternalId) : loanId;
 
         CommandWrapperBuilder builder = new CommandWrapperBuilder().createDelinquencyAction(resolvedLoanId);
         builder.withJson(apiRequestBodyAsJson);
         CommandProcessingResult result = this.commandsSourceWritePlatformService.logCommandSource(builder.build());
         return delinquencyActionSerializer.serialize(result);
+    }
+
+    private CommandProcessingResult modifyLoanApprovedAmount(Long loanId, ExternalId loanExternalId, String apiRequestBodyAsJson) {
+        Long resolvedLoanId = loanId == null ? loanReadPlatformService.getResolvedLoanId(loanExternalId) : loanId;
+        final CommandWrapperBuilder builder = new CommandWrapperBuilder().withJson(apiRequestBodyAsJson);
+        CommandWrapper commandRequest = builder.updateLoanApprovedAmount(resolvedLoanId).build();
+
+        return this.commandsSourceWritePlatformService.logCommandSource(commandRequest);
+    }
+
+    private List<LoanApprovedAmountHistoryData> getLoanApprovedAmountHistory(Long loanId, ExternalId loanExternalId) {
+        context.authenticatedUser().validateHasReadPermission(RESOURCE_NAME_FOR_PERMISSIONS);
+        Long resolvedLoanId = loanId == null ? loanReadPlatformService.getResolvedLoanId(loanExternalId) : loanId;
+        Pageable sortedByCreationDate = Pageable.unpaged(Sort.by("createdDate").ascending());
+        return loanApprovedAmountHistoryRepository.findAllByLoanId(resolvedLoanId, sortedByCreationDate);
     }
 
 }

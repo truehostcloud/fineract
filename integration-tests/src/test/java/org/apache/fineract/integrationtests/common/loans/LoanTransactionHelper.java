@@ -45,6 +45,7 @@ import java.util.Locale;
 import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.fineract.client.models.AdvancedPaymentData;
+import org.apache.fineract.client.models.BuyDownFeeAmortizationDetails;
 import org.apache.fineract.client.models.CommandProcessingResult;
 import org.apache.fineract.client.models.DeleteLoansLoanIdChargesChargeIdResponse;
 import org.apache.fineract.client.models.DeleteLoansLoanIdResponse;
@@ -68,6 +69,7 @@ import org.apache.fineract.client.models.GetLoansLoanIdTransactionsTemplateRespo
 import org.apache.fineract.client.models.GetLoansLoanIdTransactionsTransactionIdResponse;
 import org.apache.fineract.client.models.GetLoansResponse;
 import org.apache.fineract.client.models.InterestPauseRequestDto;
+import org.apache.fineract.client.models.LoanDeferredIncomeData;
 import org.apache.fineract.client.models.PaymentTypeData;
 import org.apache.fineract.client.models.PostAddAndDeleteDisbursementDetailRequest;
 import org.apache.fineract.client.models.PostLoanProductsRequest;
@@ -3046,6 +3048,10 @@ public class LoanTransactionHelper {
                 .ok(FineractClientHelper.getFineractClient().loanTransactions.executeLoanTransaction(loanId, request, "undo-charge-off"));
     }
 
+    public LoanDeferredIncomeData fetchDeferredIncomeDetails(Long loanId) {
+        return Calls.ok(FineractClientHelper.getFineractClient().loanDeferredIncome.fetchDeferredIncomeDetails(loanId));
+    }
+
     // TODO: Rewrite to use fineract-client instead!
     // Example: org.apache.fineract.integrationtests.common.loans.LoanTransactionHelper.disburseLoan(java.lang.Long,
     // org.apache.fineract.client.models.PostLoansLoanIdRequest)
@@ -3171,5 +3177,9 @@ public class LoanTransactionHelper {
                 .withRepaymentStrategy(repaymentStrategy).withCharges(charges)
                 .build(clientID.toString(), loanProductID.toString(), savingsId);
         return getLoanId(loanApplicationJSON);
+    }
+
+    public List<BuyDownFeeAmortizationDetails> fetchBuyDownFeeAmortizationDetails(Long loanId) {
+        return Calls.ok(FineractClientHelper.getFineractClient().loanBuyDownFeesApi.retrieveLoanBuyDownFeeAmortizationDetails(loanId));
     }
 }

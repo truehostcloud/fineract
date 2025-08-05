@@ -105,11 +105,14 @@ import org.apache.fineract.portfolio.loanaccount.serialization.LoanUpdateCommand
 import org.apache.fineract.portfolio.loanaccount.service.BulkLoansReadPlatformService;
 import org.apache.fineract.portfolio.loanaccount.service.BulkLoansReadPlatformServiceImpl;
 import org.apache.fineract.portfolio.loanaccount.service.BuyDownFeePlatformService;
+import org.apache.fineract.portfolio.loanaccount.service.BuyDownFeeReadPlatformService;
+import org.apache.fineract.portfolio.loanaccount.service.BuyDownFeeReadPlatformServiceImpl;
 import org.apache.fineract.portfolio.loanaccount.service.BuyDownFeeWritePlatformServiceImpl;
 import org.apache.fineract.portfolio.loanaccount.service.GLIMAccountInfoReadPlatformService;
 import org.apache.fineract.portfolio.loanaccount.service.GLIMAccountInfoReadPlatformServiceImpl;
 import org.apache.fineract.portfolio.loanaccount.service.GLIMAccountInfoWritePlatformService;
 import org.apache.fineract.portfolio.loanaccount.service.GLIMAccountInfoWritePlatformServiceImpl;
+import org.apache.fineract.portfolio.loanaccount.service.InterestRefundServiceDelegate;
 import org.apache.fineract.portfolio.loanaccount.service.LoanAccountServiceImpl;
 import org.apache.fineract.portfolio.loanaccount.service.LoanAccrualActivityProcessingService;
 import org.apache.fineract.portfolio.loanaccount.service.LoanAccrualEventService;
@@ -142,6 +145,7 @@ import org.apache.fineract.portfolio.loanaccount.service.LoanDisbursementService
 import org.apache.fineract.portfolio.loanaccount.service.LoanDownPaymentHandlerService;
 import org.apache.fineract.portfolio.loanaccount.service.LoanDownPaymentHandlerServiceImpl;
 import org.apache.fineract.portfolio.loanaccount.service.LoanJournalEntryPoster;
+import org.apache.fineract.portfolio.loanaccount.service.LoanMaximumAmountCalculator;
 import org.apache.fineract.portfolio.loanaccount.service.LoanOfficerService;
 import org.apache.fineract.portfolio.loanaccount.service.LoanReadPlatformService;
 import org.apache.fineract.portfolio.loanaccount.service.LoanReadPlatformServiceImpl;
@@ -177,6 +181,7 @@ import org.apache.fineract.portfolio.savings.service.GSIMReadPlatformService;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 @Configuration
@@ -344,7 +349,8 @@ public class LoanAccountConfiguration {
             LoanForeclosureValidator loanForeclosureValidator, LoanTransactionMapper loanTransactionMapper,
             LoanTransactionProcessingService loanTransactionProcessingService, LoanBalanceService loanBalanceService,
             LoanCapitalizedIncomeBalanceRepository loanCapitalizedIncomeBalanceRepository,
-            LoanBuyDownFeeBalanceRepository loanBuyDownFeeBalanceRepository) {
+            LoanBuyDownFeeBalanceRepository loanBuyDownFeeBalanceRepository,
+            @Lazy InterestRefundServiceDelegate interestRefundServiceDelegate, LoanMaximumAmountCalculator loanMaximumAmountCalculator) {
         return new LoanReadPlatformServiceImpl(jdbcTemplate, context, loanRepositoryWrapper, applicationCurrencyRepository,
                 loanProductReadPlatformService, clientReadPlatformService, groupReadPlatformService, loanDropdownReadPlatformService,
                 fundReadPlatformService, chargeReadPlatformService, codeValueReadPlatformService, calendarReadPlatformService,
@@ -352,7 +358,8 @@ public class LoanAccountConfiguration {
                 loanUtilService, configurationDomainService, accountDetailsReadPlatformService, columnValidator, sqlGenerator,
                 delinquencyReadPlatformService, loanTransactionRepository, loanChargePaidByReadService, loanTransactionRelationReadService,
                 loanForeclosureValidator, loanTransactionMapper, loanTransactionProcessingService, loanBalanceService,
-                loanCapitalizedIncomeBalanceRepository, loanBuyDownFeeBalanceRepository);
+                loanCapitalizedIncomeBalanceRepository, loanBuyDownFeeBalanceRepository, interestRefundServiceDelegate,
+                loanMaximumAmountCalculator);
     }
 
     @Bean
@@ -390,11 +397,19 @@ public class LoanAccountConfiguration {
             NoteWritePlatformService noteWritePlatformService, ExternalIdFactory externalIdFactory,
             LoanBuyDownFeeBalanceRepository loanBuyDownFeeBalanceRepository,
             ReprocessLoanTransactionsService reprocessLoanTransactionsService, LoanBalanceService loanBalanceService,
-            LoanLifecycleStateMachine loanLifecycleStateMachine, BusinessEventNotifierService businessEventNotifierService) {
+            LoanLifecycleStateMachine loanLifecycleStateMachine, BusinessEventNotifierService businessEventNotifierService,
+            LoanTransactionRelationRepository loanTransactionRelationRepository) {
         return new BuyDownFeeWritePlatformServiceImpl(loanTransactionValidator, loanAssembler, loanTransactionRepository,
                 paymentDetailWritePlatformService, loanJournalEntryPoster, noteWritePlatformService, externalIdFactory,
                 loanBuyDownFeeBalanceRepository, reprocessLoanTransactionsService, loanBalanceService, loanLifecycleStateMachine,
-                businessEventNotifierService);
+                businessEventNotifierService, loanTransactionRelationRepository);
+    }
+
+    @Bean
+    @ConditionalOnMissingBean(BuyDownFeeReadPlatformService.class)
+    public BuyDownFeeReadPlatformService buyDownFeeReadPlatformService(
+            final LoanBuyDownFeeBalanceRepository loanBuyDownFeeBalanceRepository, final LoanRepository loanRepository) {
+        return new BuyDownFeeReadPlatformServiceImpl(loanBuyDownFeeBalanceRepository, loanRepository);
     }
 
     @Bean

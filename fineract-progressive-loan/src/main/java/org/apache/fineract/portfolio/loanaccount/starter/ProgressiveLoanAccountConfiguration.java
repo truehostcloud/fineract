@@ -27,6 +27,8 @@ import org.apache.fineract.portfolio.loanaccount.domain.LoanTransactionRepositor
 import org.apache.fineract.portfolio.loanaccount.repository.LoanBuyDownFeeBalanceRepository;
 import org.apache.fineract.portfolio.loanaccount.repository.LoanCapitalizedIncomeBalanceRepository;
 import org.apache.fineract.portfolio.loanaccount.serialization.LoanTransactionValidator;
+import org.apache.fineract.portfolio.loanaccount.service.CapitalizedIncomeBalanceReadService;
+import org.apache.fineract.portfolio.loanaccount.service.CapitalizedIncomeBalanceReadServiceImpl;
 import org.apache.fineract.portfolio.loanaccount.service.CapitalizedIncomeBalanceService;
 import org.apache.fineract.portfolio.loanaccount.service.CapitalizedIncomeBalanceServiceImpl;
 import org.apache.fineract.portfolio.loanaccount.service.CapitalizedIncomePlatformService;
@@ -34,6 +36,7 @@ import org.apache.fineract.portfolio.loanaccount.service.CapitalizedIncomeWriteP
 import org.apache.fineract.portfolio.loanaccount.service.LoanAssembler;
 import org.apache.fineract.portfolio.loanaccount.service.LoanBalanceService;
 import org.apache.fineract.portfolio.loanaccount.service.LoanJournalEntryPoster;
+import org.apache.fineract.portfolio.loanaccount.service.LoanMaximumAmountCalculator;
 import org.apache.fineract.portfolio.loanaccount.service.ProgressiveLoanTransactionValidator;
 import org.apache.fineract.portfolio.loanaccount.service.ProgressiveLoanTransactionValidatorImpl;
 import org.apache.fineract.portfolio.loanaccount.service.ReprocessLoanTransactionsService;
@@ -66,9 +69,11 @@ public class ProgressiveLoanAccountConfiguration {
     public ProgressiveLoanTransactionValidator progressiveLoanTransactionValidator(FromJsonHelper fromApiJsonHelper,
             LoanTransactionValidator loanTransactionValidator, LoanRepositoryWrapper loanRepositoryWrapper,
             LoanCapitalizedIncomeBalanceRepository loanCapitalizedIncomeBalanceRepository,
-            LoanBuyDownFeeBalanceRepository loanBuydownFeeBalanceRepository, LoanTransactionRepository loanTransactionRepository) {
+            LoanBuyDownFeeBalanceRepository loanBuydownFeeBalanceRepository, LoanTransactionRepository loanTransactionRepository,
+            LoanMaximumAmountCalculator loanMaximumAmountCalculator) {
         return new ProgressiveLoanTransactionValidatorImpl(fromApiJsonHelper, loanTransactionValidator, loanRepositoryWrapper,
-                loanCapitalizedIncomeBalanceRepository, loanBuydownFeeBalanceRepository, loanTransactionRepository);
+                loanCapitalizedIncomeBalanceRepository, loanBuydownFeeBalanceRepository, loanTransactionRepository,
+                loanMaximumAmountCalculator);
     }
 
     @Bean
@@ -76,5 +81,12 @@ public class ProgressiveLoanAccountConfiguration {
     public CapitalizedIncomeBalanceService capitalizedIncomeBalanceService(
             LoanCapitalizedIncomeBalanceRepository loanCapitalizedIncomeBalanceRepository) {
         return new CapitalizedIncomeBalanceServiceImpl(loanCapitalizedIncomeBalanceRepository);
+    }
+
+    @Bean
+    @ConditionalOnMissingBean(CapitalizedIncomeBalanceReadService.class)
+    public CapitalizedIncomeBalanceReadService capitalizedIncomeBalanceReadService(LoanRepositoryWrapper loanRepository,
+            LoanCapitalizedIncomeBalanceRepository loanCapitalizedIncomeBalanceRepository) {
+        return new CapitalizedIncomeBalanceReadServiceImpl(loanRepository, loanCapitalizedIncomeBalanceRepository);
     }
 }
