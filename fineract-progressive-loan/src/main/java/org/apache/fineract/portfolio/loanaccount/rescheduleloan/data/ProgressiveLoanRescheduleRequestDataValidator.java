@@ -24,7 +24,6 @@ import static org.apache.fineract.portfolio.loanaccount.rescheduleloan.data.Loan
 import static org.apache.fineract.portfolio.loanaccount.rescheduleloan.data.LoanRescheduleRequestDataValidatorImpl.validateAndRetrieveRescheduleFromDate;
 import static org.apache.fineract.portfolio.loanaccount.rescheduleloan.data.LoanRescheduleRequestDataValidatorImpl.validateApprovalDate;
 import static org.apache.fineract.portfolio.loanaccount.rescheduleloan.data.LoanRescheduleRequestDataValidatorImpl.validateForOverdueCharges;
-import static org.apache.fineract.portfolio.loanaccount.rescheduleloan.data.LoanRescheduleRequestDataValidatorImpl.validateInterestRate;
 import static org.apache.fineract.portfolio.loanaccount.rescheduleloan.data.LoanRescheduleRequestDataValidatorImpl.validateLoanIsActive;
 import static org.apache.fineract.portfolio.loanaccount.rescheduleloan.data.LoanRescheduleRequestDataValidatorImpl.validateRescheduleReasonComment;
 import static org.apache.fineract.portfolio.loanaccount.rescheduleloan.data.LoanRescheduleRequestDataValidatorImpl.validateRescheduleReasonId;
@@ -46,7 +45,6 @@ import org.apache.fineract.infrastructure.core.data.DataValidatorBuilder;
 import org.apache.fineract.infrastructure.core.exception.GeneralPlatformDomainRuleException;
 import org.apache.fineract.infrastructure.core.exception.PlatformApiDataValidationException;
 import org.apache.fineract.infrastructure.core.serialization.FromJsonHelper;
-import org.apache.fineract.infrastructure.core.service.DateUtils;
 import org.apache.fineract.portfolio.loanaccount.domain.Loan;
 import org.apache.fineract.portfolio.loanaccount.domain.LoanRepaymentScheduleInstallment;
 import org.apache.fineract.portfolio.loanaccount.domain.LoanStatus;
@@ -78,8 +76,7 @@ public class ProgressiveLoanRescheduleRequestDataValidator implements LoanResche
         validateRescheduleReasonId(fromJsonHelper, jsonElement, dataValidatorBuilder);
         validateRescheduleReasonComment(fromJsonHelper, jsonElement, dataValidatorBuilder);
         LocalDate adjustedDueDate = validateAndRetrieveAdjustedDate(fromJsonHelper, jsonElement, rescheduleFromDate, dataValidatorBuilder);
-        BigDecimal interestRate = validateInterestRate(loan.getLoanRepaymentScheduleDetail().getAnnualNominalInterestRate(), fromJsonHelper,
-                jsonElement, dataValidatorBuilder);
+        BigDecimal interestRate = validateInterestRate(fromJsonHelper, jsonElement, dataValidatorBuilder);
         validateUnsupportedParams(jsonElement, dataValidatorBuilder);
 
         boolean hasInterestRateChange = interestRate != null;
@@ -91,18 +88,8 @@ public class ProgressiveLoanRescheduleRequestDataValidator implements LoanResche
                     "Only one operation is supported at a time during Loan Rescheduling");
         }
 
-        final LocalDate businessDate = DateUtils.getBusinessLocalDate();
-        if (rescheduleFromDate != null) {
-            if (hasInterestRateChange && !rescheduleFromDate.isAfter(businessDate)) {
-                throw new GeneralPlatformDomainRuleException(
-                        "loan.reschedule.interest.rate.change.reschedule.from.date.should.be.in.future",
-                        String.format("Loan Reschedule From date (%s) for Loan: %s should be in the future.", rescheduleFromDate,
-                                loan.getId()),
-                        loan.getId(), rescheduleFromDate);
-            }
-            if (hasInterestRateChange) {
-                validateInterestRateChangeRescheduleFromDate(loan, rescheduleFromDate);
-            }
+        if (rescheduleFromDate != null && hasInterestRateChange) {
+            validateInterestRateChangeRescheduleFromDate(loan, rescheduleFromDate);
         }
 
         LoanRepaymentScheduleInstallment installment;
@@ -161,13 +148,6 @@ public class ProgressiveLoanRescheduleRequestDataValidator implements LoanResche
 
         if (loanRescheduleRequest.getInterestRateFromInstallmentTermVariationIfExists() != null) {
             installment = loan.getRelatedRepaymentScheduleInstallment(rescheduleFromDate);
-            if (!rescheduleFromDate.isAfter(DateUtils.getBusinessLocalDate())) {
-                throw new GeneralPlatformDomainRuleException(
-                        "loan.reschedule.interest.rate.change.reschedule.from.date.should.be.in.future",
-                        String.format("Loan Reschedule From date (%s) for Loan: %s should be in the future.", rescheduleFromDate,
-                                loan.getId()),
-                        loan.getId(), rescheduleFromDate);
-            }
         } else {
             installment = loan.fetchLoanRepaymentScheduleInstallmentByDueDate(rescheduleFromDate);
         }
@@ -196,5 +176,14 @@ public class ProgressiveLoanRescheduleRequestDataValidator implements LoanResche
             throw new GeneralPlatformDomainRuleException("loan.reschedule.interest.rate.change.already.exists",
                     "Interest rate change for the provided date is already exists.", rescheduleFromDate);
         }
+    }
+
+    private BigDecimal validateInterestRate(final FromJsonHelper fromJsonHelper, final JsonElement jsonElement,
+            DataValidatorBuilder dataValidatorBuilder) {
+        final BigDecimal interestRate = fromJsonHelper
+                .extractBigDecimalWithLocaleNamed(RescheduleLoansApiConstants.newInterestRateParamName, jsonElement);
+        dataValidatorBuilder.reset().parameter(RescheduleLoansApiConstants.newInterestRateParamName).value(interestRate).ignoreIfNull()
+                .zeroOrPositiveAmount();
+        return interestRate;
     }
 }

@@ -16,15 +16,12 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.fineract.cob.data;
+package org.apache.fineract.portfolio.loanaccount.data;
 
-import org.apache.fineract.infrastructure.core.domain.ExternalId;
+import java.math.BigDecimal;
+import java.time.LocalDate;
 
-public interface LoanIdAndExternalIdAndAccountNo {
+public record BuyDownFeeAmortizationDetails(Long id, Long loanId, Long transactionId, LocalDate buyDownFeeDate, BigDecimal buyDownFeeAmount,
+        BigDecimal amortizedAmount, BigDecimal notYetAmortizedAmount, BigDecimal adjustedAmount, BigDecimal chargedOffAmount) {
 
-    Long getId();
-
-    ExternalId getExternalId();
-
-    String getAccountNo();
 }

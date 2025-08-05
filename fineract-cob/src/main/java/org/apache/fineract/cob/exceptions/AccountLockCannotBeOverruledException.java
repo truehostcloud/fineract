@@ -18,13 +18,13 @@
  */
 package org.apache.fineract.cob.exceptions;
 
-public class LoanAccountLockCannotBeOverruledException extends RuntimeException {
+public class AccountLockCannotBeOverruledException extends RuntimeException {
 
-    public LoanAccountLockCannotBeOverruledException(String message) {
+    public AccountLockCannotBeOverruledException(String message) {
         super(message);
     }
 
-    public LoanAccountLockCannotBeOverruledException(String message, Exception e) {
+    public AccountLockCannotBeOverruledException(String message, Exception e) {
         super(message, e);
     }
 

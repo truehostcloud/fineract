@@ -46,8 +46,10 @@ import org.apache.fineract.infrastructure.configuration.domain.ConfigurationDoma
 import org.apache.fineract.infrastructure.core.api.ApiFacingEnum;
 import org.apache.fineract.infrastructure.core.data.EnumOptionData;
 import org.apache.fineract.infrastructure.core.data.StringEnumOptionData;
+import org.apache.fineract.infrastructure.core.domain.AbstractPersistableCustom;
 import org.apache.fineract.infrastructure.core.domain.ExternalId;
 import org.apache.fineract.infrastructure.core.domain.JdbcSupport;
+import org.apache.fineract.infrastructure.core.exception.GeneralPlatformDomainRuleException;
 import org.apache.fineract.infrastructure.core.service.DateUtils;
 import org.apache.fineract.infrastructure.core.service.ExternalIdFactory;
 import org.apache.fineract.infrastructure.core.service.MathUtil;
@@ -192,6 +194,8 @@ public class LoanReadPlatformServiceImpl implements LoanReadPlatformService, Loa
     private final LoanBalanceService loanBalanceService;
     private final LoanCapitalizedIncomeBalanceRepository loanCapitalizedIncomeBalanceRepository;
     private final LoanBuyDownFeeBalanceRepository loanBuyDownFeeBalanceRepository;
+    private final InterestRefundServiceDelegate interestRefundServiceDelegate;
+    private final LoanMaximumAmountCalculator loanMaximumAmountCalculator;
 
     @Override
     public LoanAccountData retrieveOne(final Long loanId) {
@@ -485,36 +489,20 @@ public class LoanReadPlatformServiceImpl implements LoanReadPlatformService, Loa
             case CAPITALIZED_INCOME:
                 final Loan loan = loanRepositoryWrapper.findOneWithNotFoundDetection(loanId);
                 BigDecimal capitalizedIncomeBalance = BigDecimal.ZERO;
-                BigDecimal buyDownFeeBalance = BigDecimal.ZERO;
                 if (loan.getLoanProduct().getLoanProductRelatedDetail().isEnableIncomeCapitalization()) {
                     capitalizedIncomeBalance = loanCapitalizedIncomeBalanceRepository.findAllByLoanId(loanId).stream()
                             .map(LoanCapitalizedIncomeBalance::getAmount).reduce(BigDecimal.ZERO, BigDecimal::add);
                 }
-                // Calculate Buy Down Fee balance to subtract from Capitalized Income formula
-                buyDownFeeBalance = loanBuyDownFeeBalanceRepository.findAllByLoanId(loanId).stream().map(LoanBuyDownFeeBalance::getAmount)
-                        .reduce(BigDecimal.ZERO, BigDecimal::add);
-                transactionAmount = loan.getApprovedPrincipal().subtract(loan.getDisbursedAmount()).subtract(capitalizedIncomeBalance)
-                        .subtract(buyDownFeeBalance);
+                transactionAmount = loan.getLoanProduct().isAllowApprovedDisbursedAmountsOverApplied()
+                        ? loanMaximumAmountCalculator.getOverAppliedMax(loan)
+                        : loan.getApprovedPrincipal();
+                transactionAmount = transactionAmount.subtract(loan.getDisbursedAmount()).subtract(capitalizedIncomeBalance);
                 paymentOptions = this.paymentTypeReadPlatformService.retrieveAllPaymentTypes();
                 loanTransactionData = LoanTransactionData.loanTransactionDataForCreditTemplate(
                         LoanEnumerations.transactionType(transactionType), DateUtils.getBusinessLocalDate(), transactionAmount,
                         paymentOptions, retriveLoanCurrencyData(loanId));
             break;
             case BUY_DOWN_FEE:
-                final Loan buyDownLoan = loanRepositoryWrapper.findOneWithNotFoundDetection(loanId);
-                BigDecimal buyDownFeeBalanceForCalc = BigDecimal.ZERO;
-                BigDecimal capitalizedIncomeBalanceForCalc = BigDecimal.ZERO;
-
-                // Calculate existing Buy Down Fee balance
-                buyDownFeeBalanceForCalc = loanBuyDownFeeBalanceRepository.findAllByLoanId(loanId).stream()
-                        .map(LoanBuyDownFeeBalance::getAmount).reduce(BigDecimal.ZERO, BigDecimal::add);
-                // Calculate Capitalized Income balance to subtract from Buy Down Fee formula
-                if (buyDownLoan.getLoanProduct().getLoanProductRelatedDetail().isEnableIncomeCapitalization()) {
-                    capitalizedIncomeBalanceForCalc = loanCapitalizedIncomeBalanceRepository.findAllByLoanId(loanId).stream()
-                            .map(LoanCapitalizedIncomeBalance::getAmount).reduce(BigDecimal.ZERO, BigDecimal::add);
-                }
-                transactionAmount = buyDownLoan.getApprovedPrincipal().subtract(buyDownLoan.getDisbursedAmount())
-                        .subtract(buyDownFeeBalanceForCalc).subtract(capitalizedIncomeBalanceForCalc);
                 paymentOptions = this.paymentTypeReadPlatformService.retrieveAllPaymentTypes();
                 loanTransactionData = LoanTransactionData.loanTransactionDataForCreditTemplate(
                         LoanEnumerations.transactionType(transactionType), DateUtils.getBusinessLocalDate(), transactionAmount,
@@ -2446,6 +2434,52 @@ public class LoanReadPlatformServiceImpl implements LoanReadPlatformService, Loa
     @Override
     public boolean existsByLoanId(Long loanId) {
         return loanRepositoryWrapper.existsByLoanId(loanId);
+    }
+
+    @Override
+    public LoanTransactionData retrieveManualInterestRefundTemplate(final Long loanId, final Long targetTransactionId) {
+        final Loan loan = loanRepositoryWrapper.findOneWithNotFoundDetection(loanId);
+        final LoanTransaction targetTxn = loan.getLoanTransaction(txn -> txn.getId() != null && txn.getId().equals(targetTransactionId));
+        if (targetTxn == null) {
+            throw new LoanTransactionNotFoundException(targetTransactionId);
+        }
+        if (!(targetTxn.isMerchantIssuedRefund() || targetTxn.isPayoutRefund())) {
+            throw new GeneralPlatformDomainRuleException("error.msg.loan.transaction.not.refund.type", "Only for refund transactions");
+        }
+        if (targetTxn.isReversed()) {
+            throw new GeneralPlatformDomainRuleException("error.msg.loan.transaction.reversed", "Refund transaction is reversed");
+        }
+        final boolean alreadyExists = loan.getLoanTransactions().stream().anyMatch(txn -> txn.isInterestRefund() && !txn
+                .getLoanTransactionRelations(rel -> rel.getToTransaction() != null && rel.getToTransaction().equals(targetTxn)).isEmpty());
+        if (alreadyExists) {
+            throw new GeneralPlatformDomainRuleException("error.msg.loan.transaction.interest.refund.already.exists",
+                    "Interest Refund already exists for this refund");
+        }
+
+        final InterestRefundService interestRefundService = interestRefundServiceDelegate.lookupInterestRefundService(loan);
+        final Money totalInterest = interestRefundService.totalInterestByTransactions(null, loan.getId(), targetTxn.getTransactionDate(),
+                List.of(), loan.getLoanTransactions().stream().map(AbstractPersistableCustom::getId).toList());
+        final Money newTotalInterest = interestRefundService.totalInterestByTransactions(null, loan.getId(), targetTxn.getTransactionDate(),
+                List.of(targetTxn), loan.getLoanTransactions().stream().map(AbstractPersistableCustom::getId).toList());
+        final BigDecimal interestRefundAmount = totalInterest.minus(newTotalInterest).getAmount();
+        final Collection<PaymentTypeData> paymentTypeOptions = paymentTypeReadPlatformService.retrieveAllPaymentTypes();
+        final LoanTransactionEnumData transactionType = LoanEnumerations.transactionType(LoanTransactionType.INTEREST_REFUND);
+
+        return LoanTransactionData.loanTransactionDataForCreditTemplate(transactionType, targetTxn.getTransactionDate(),
+                interestRefundAmount, paymentTypeOptions, loan.getCurrency().toData());
+    }
+
+    @Override
+    public Long getResolvedLoanId(final ExternalId loanExternalId) {
+        loanExternalId.throwExceptionIfEmpty();
+
+        final Long resolvedLoanId = retrieveLoanIdByExternalId(loanExternalId);
+
+        if (resolvedLoanId == null) {
+            throw new LoanNotFoundException(loanExternalId);
+        }
+
+        return resolvedLoanId;
     }
 
     private LoanTransaction deriveDefaultInterestWaiverTransaction(final Loan loan) {

@@ -8,6 +8,7 @@ permissions:
 jobs:
   verify:
     runs-on: ubuntu-24.04
+    timeout-minutes: 60
 
     strategy:
       fail-fast: false
@@ -53,6 +54,8 @@ jobs:
       - name: Run Gradle Task
         if: matrix.job_type == 'main'
         run: |
+          set -e  # Fail the script if any command fails
+
           case "${{ matrix.task }}" in
             build-core)
               ./gradlew --no-daemon build -x test -x cucumber -x doc
