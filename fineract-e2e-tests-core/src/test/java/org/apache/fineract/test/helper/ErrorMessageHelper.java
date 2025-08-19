@@ -59,6 +59,26 @@ public final class ErrorMessageHelper {
         return "Loan has a wrong http status";
     }
 
+    public static String setIncorrectBusinessDateFailure() {
+        return "Wrong local date fields.";
+    }
+
+    public static String setIncorrectBusinessDateMandatoryFailure() {
+        return "The parameter 'date' is mandatory: '${validatedValue}'.";
+    }
+
+    public static String setCurrencyEmptyValueFailure() {
+        return "The parameter 'currencies' cannot be empty.";
+    }
+
+    public static String setCurrencyIncorrectValueFailure(String value) {
+        return String.format("Currency with identifier %s does not exist", value);
+    }
+
+    public static String setCurrencyNullValueMandatoryFailure() {
+        return "The parameter 'currencies' is mandatory.";
+    }
+
     public static String disburseDateFailure(Integer loanId) {
         String loanIdStr = parseLoanIdToString(loanId);
         return String.format("The date on which a loan with identifier : %s is disbursed cannot be in the future.", loanIdStr);
@@ -172,16 +192,15 @@ public final class ErrorMessageHelper {
     }
 
     public static String addCapitalizedIncomeUndoFailureTransactionTypeNonReversal() {
-        return "Only (non-reversed) transactions of type repayment, waiver, accrual, credit balance refund, capitalized income, capitalized income adjustment or buy down fee adjustment can be adjusted.";
+        return "Only (non-reversed) transactions of type repayment, waiver, accrual, credit balance refund, capitalized income, capitalized income adjustment, buy down fee or buy down fee adjustment can be adjusted.";
     }
 
     public static String addCapitalizedIncomeUndoFailureAdjustmentExists() {
         return "Capitalized income transaction cannot be reversed when non-reversed adjustment exists for it.";
     }
 
-    public static String buyDownFeeUndoFailureAdjustmentExists(Long loanId) {
-        String loanIdStr = String.valueOf(loanId);
-        return String.format("Undo Loan Transaction: %s is not allowed. Loan transaction has not reversed transaction related", loanIdStr);
+    public static String buyDownFeeUndoFailureAdjustmentExists() {
+        return "Buy down fee transaction cannot be reversed when non-reversed adjustment exists for it.";
     }
 
     public static String wrongAmountInRepaymentSchedule(int line, BigDecimal actual, BigDecimal expected) {
@@ -1004,6 +1023,14 @@ public final class ErrorMessageHelper {
 
     public static String updateApprovedLoanLessMinAllowedAmountFailure() {
         return "The parameter `amount` must be greater than 0.";
+    }
+
+    public static String updateAvailableDisbursementLoanExceedPrincipalFailure() {
+        return "Failed data validation due to: can't.be.greater.than.maximum.available.disbursement.amount.calculation.";
+    }
+
+    public static String updateAvailableDisbursementLoanLessMinAllowedAmountFailure() {
+        return "The parameter `amount` must be greater than or equal to 0.";
     }
 
     public static String wrongValueInLineInBuyDownFeeTab(String resourceId, int line, List<List<String>> actualList,

@@ -26,7 +26,6 @@ buildscript {
         fineractCustomProjects = []
         fineractJavaProjects = subprojects.findAll{
             [
-                'fineract-api',
                 'fineract-core',
                 'fineract-cob',
                 'fineract-validation',
@@ -56,7 +55,6 @@ buildscript {
         fineractPublishProjects = subprojects.findAll{
             [
                 'fineract-avro-schemas',
-                'fineract-api',
                 'fineract-client',
                 'fineract-core',
                 'fineract-cob',
@@ -107,6 +105,10 @@ plugins {
     id 'net.ltgt.errorprone' version '4.1.0' apply false
     id 'io.swagger.core.v3.swagger-gradle-plugin' version '2.2.23' apply false
     id 'com.gorylenko.gradle-git-properties' version '2.4.2' apply false
+    // can't upgrade to 4.x because of one of these:
+    // https://github.com/asciidoctor/asciidoctorj-pdf/issues/25
+    // https://github.com/jruby/jruby/issues/5573
+    // https://github.com/asciidoctor/asciidoctorj-pdf/issues/16
     id 'org.asciidoctor.jvm.convert' version '3.3.2' apply false
     id 'org.asciidoctor.jvm.pdf' version '3.3.2' apply false
     id 'com.google.cloud.tools.jib' version '3.4.5' apply false
@@ -148,7 +150,7 @@ gitVersioning.apply {
 }
 
 ext['groovy.version'] = '4.0.17'
-ext['swaggerFile'] = "$rootDir/fineract-provider/build/classes/java/main/static/fineract.json".toString()
+ext['swaggerFile'] = "$rootDir/fineract-provider/build/resources/main/static/fineract.json".toString()
 
 // Apply static weaving configuration to all subprojects
 subprojects { subproject ->
@@ -528,7 +530,7 @@ configure(project.fineractJavaProjects) {
     // Configuration for the Checkstyle plugin
     // https://docs.gradle.org/current/userguide/checkstyle_plugin.html
     dependencies {
-        checkstyle 'com.puppycrawl.tools:checkstyle:10.20.1'
+        checkstyle 'com.puppycrawl.tools:checkstyle:11.0.0'
         checkstyle 'com.github.sevntu-checkstyle:sevntu-checks:1.44.1'
     }
 
